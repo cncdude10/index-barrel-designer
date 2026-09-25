@@ -1770,7 +1770,8 @@ update();
 /* ── app wiring ── */
 cutToForm();
 document.querySelectorAll('#c-prog,#c-tool,#c-dir,#c-rpm,#c-feed,#c-plunge,#c-pass,#c-clear,#c-gap').forEach(el=>el.addEventListener('change',formToCut));
-$('#b-save').addEventListener('click',()=>{saveFile(fileBase()+'.json',designJSON(),'application/json');say('#exp-msg',`Saved ${fileBase()}.json`,'ok');});
+// _DESIGN in the name: this file re-opens HERE. The program builder loads the EXPORT "For the program builder" file instead
+$('#b-save').addEventListener('click',()=>{const n=fileBase()+'_DESIGN.json';saveFile(n,designJSON(),'application/json');say('#exp-msg',`Saved ${n}. It opens here, in the designer. For the program builder use EXPORT > For the program builder .json`,'ok');});
 $('#b-open').addEventListener('click',()=>$('#f-open').click());
 $('#f-open').addEventListener('change',e=>{const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=()=>{try{loadDesign(rd.result);say('#exp-msg',`Opened ${f.name}`,'ok');}catch(err){say('#exp-msg',`Could not open ${f.name}: ${err.message}`,'bad');}};
@@ -1820,7 +1821,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (cc5d67486102) */
+<script>/* installable build (c77f2b718415) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
