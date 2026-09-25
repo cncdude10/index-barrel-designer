@@ -87,6 +87,13 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 #unrolled{width:100%;height:auto;display:block;}
 #wrapbox{position:relative;}
 #wrap{width:100%;display:block;cursor:grab;touch-action:none;}
+#w3d{width:100%;display:none;cursor:grab;touch-action:none;}
+.v3-on #w3d{display:block;} .v3-on #wrap,.v3-on .v2-f,.v3-f{display:none;} .v3-on .v3-f{display:flex;}
+.v3-f{flex-wrap:wrap;gap:6px 12px;}
+.v3-f .seg .lbl{align-self:center;margin-right:4px;}
+.v3-leg{display:inline-flex;gap:10px;} .v3-leg span{display:inline-flex;align-items:center;gap:4px;}
+.v3-hint{color:var(--dim);}
+.view-h .v3-seg{display:none;} .v3-on .view-h .v3-seg{display:inline-flex;}
 .view-f{display:flex;align-items:center;gap:8px;padding:6px 9px;border-top:1px solid var(--line);font-size:10px;color:var(--dim);}
 .view-f input[type=range]{flex:1;accent-color:var(--accent);}
 .legend{display:flex;flex-wrap:wrap;gap:12px;}
@@ -261,6 +268,9 @@ body.tabs.cur-path #unrolled{height:max(240px,calc(100dvh - 285px));touch-action
 body.tabs.cur-path .readout{display:flex;overflow-x:auto;gap:6px;padding-bottom:2px;}
 body.tabs.cur-path .readout .ro{flex:0 0 auto;min-width:150px;}
 body.tabs #wrap{touch-action:pan-y;}
+body.tabs.cur-3d{overflow:hidden;height:100dvh;overscroll-behavior:none;}
+html:has(body.tabs.cur-3d){overflow:hidden;overscroll-behavior:none;}
+@media (max-width:700px){ body.tabs .v3-hint,body.tabs .v3-leg{display:none;} }
 /* PATH views (tablet layout): A and B edit one path each, BOTH only looks. Swipe left steps A > B > BOTH */
 .pv-seg,.pv-hint{display:none;}
 body.tabs .pv-seg{display:inline-flex;} body.tabs .pv-hint{display:inline;color:var(--dim);}
@@ -383,9 +393,18 @@ body.tabs .seg button{min-height:36px;}
         </div>
       </div>
       <div class="view" data-tab="3d">
-        <div class="view-h"><span>Wrapped · revolved on the barrel</span><b id="w-cap"></b></div>
-        <div id="wrapbox"><canvas id="wrap" aria-label="Barrel with the groove path repeated around it"></canvas></div>
-        <div class="view-f"><label for="rot" class="lbl">Rotate</label><input id="rot" type="range" min="0" max="360" value="20"><span id="rot-v" class="mono">20°</span></div>
+        <div class="view-h"><span>3D · the part the STL will print</span>
+          <div class="seg v3-seg" role="group" aria-label="3D view"><button type="button" data-v3="ALL" aria-pressed="true">BARREL</button><button type="button" data-v3="ONE" aria-pressed="false">ONE INDEX</button></div>
+          <b id="w-cap"></b></div>
+        <div id="wrapbox"><canvas id="w3d" aria-label="3D model of the barrel: drag to rotate, pinch or scroll to zoom, two fingers or right-drag to pan, double-tap to fit"></canvas><canvas id="wrap" aria-label="Barrel with the groove path repeated around it"></canvas></div>
+        <div class="view-f v3-f">
+          <span class="lbl">RAMP</span><div class="seg" role="group" aria-label="Ramp exaggeration (view only)"><button type="button" data-v3x="1" aria-pressed="true">×1</button><button type="button" data-v3x="3" aria-pressed="false">×3</button><button type="button" data-v3x="6" aria-pressed="false">×6</button></div>
+          <button type="button" class="btn plain" id="v3-lines" aria-pressed="true">PATH LINES</button>
+          <button type="button" class="btn plain" id="v3-fit">FIT</button>
+          <span class="v3-leg"><span><i class="sw" style="background:var(--accent)"></i>full depth</span><span><i class="sw" style="background:var(--warn)"></i>A ramp</span><span><i class="sw" style="background:var(--ok)"></i>B ramp</span></span>
+          <span class="v3-hint">drag to rotate · pinch / wheel to zoom · two fingers / right-drag to pan · double-tap to fit</span>
+        </div>
+        <div class="view-f v2-f"><label for="rot" class="lbl">Rotate</label><input id="rot" type="range" min="0" max="360" value="20"><span id="rot-v" class="mono">20°</span></div>
       </div>
     </div>
 
@@ -892,7 +911,8 @@ function drawUnrolled(g){
 /* ── wrapped canvas ── */
 const cv=$('#wrap'), ctx=cv.getContext('2d');
 function tok(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
-function drawWrap(g){
+function drawWrap(g){ if(V3.gl){ v3Dirty(); return; } drawWrap2D(g); }
+function drawWrap2D(g){
   const box=$('#wrapbox'), dpr=window.devicePixelRatio||1;
   if(box.clientWidth<40) return;   // hidden (another tab): nothing to draw into, and a zero width makes negative radii
   const W=box.clientWidth, H=Math.round(Math.min(Math.max(W*0.95,260),440));
@@ -937,6 +957,172 @@ function drawWrap(g){
   ctx.globalAlpha=1;
   $('#w-cap').textContent=`${S.N} indexes`;
 }
+
+/* ── 3D viewer: WebGL, no libraries ──
+   The mesh is carve() — the STL's own function — so what turns here is what prints. OD surface, bore,
+   both faces, and in ONE INDEX the two cut walls of the wedge. Each groove cell is coloured by the
+   track that cut it and how shallow that ball ran: full depth in the accent, A's ramp shading to
+   --warn, B's to --ok. DEPTH ×n exaggerates the groove radially so a .010 step can be seen; the
+   ball-tip centre lines ride the same exaggeration. The revision text is only in the STL. */
+const V3={gl:null,mode:'ALL',ex:1,lines:true,yaw:0,pitch:0.35,dist:3,tgt:[0,0,0],fov:30*Math.PI/180,dirty:true,mesh:null,stats:null,raf:0,timer:0,fitNext:true};
+function v3Col(n){const s=tok(n); let m=s.match(/^#([0-9a-f]{6})$/i); if(m){const v=parseInt(m[1],16);return [(v>>16&255)/255,(v>>8&255)/255,(v&255)/255];}
+  m=s.match(/^#([0-9a-f]{3})$/i); if(m) return [...m[1]].map(c=>parseInt(c+c,16)/255);
+  m=s.match(/rgba?\(([^)]+)\)/); if(m){const p=m[1].split(/[ ,]+/).map(Number);return [p[0]/255,p[1]/255,p[2]/255];} return [0.6,0.6,0.6];}
+const v3Mix=(a,b,f)=>[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f];
+function v3Build(g){
+  const R=S.D/2, r=S.ball/2, L=g.L, ex=V3.ex, one=V3.mode==='ONE', F=Math.max(S.rows.top.d,S.rows.bot.d);
+  const Dfull=Math.max(S.rows.top.d,S.rows.bot.d), Dmax=Math.max(Dfull,...S.rows.A.map(n=>n.d),...S.rows.B.map(n=>n.d));
+  const rb=Math.max(0.02,S.D/2-(Dmax+WALL));
+  let steep=0; for(const n of [...g.A,...g.B]) steep=Math.max(steep,Dfull-n.d);
+  // ONE INDEX: index 0's four tracks and the next index's top slot (where B lands), in a window round them
+  let o;
+  if(one){ const xs=[...g.top,...g.A,...g.bot,...g.B].map(p=>p.x); let x0=Math.min(...xs)-r, x1=Math.max(...xs)+r; const pad=Math.max(0.03,(x1-x0)*0.08);
+    x0-=pad; x1+=pad; if(x1-x0>2*Math.PI*R-1e-6){x1=x0+2*Math.PI*R*0.999;}
+    const span=(x1-x0)/R; o={th0:x0/R,th1:x1/R,nth:Math.max(90,Math.ceil(span/(2*Math.PI)*1440)),dzs:0.0016,ks:[0,1],only:(k,ti)=>k===0||ti===0}; }
+  else o={nth:720,dzs:0.0035,ks:undefined};
+  o.ex=ex;
+  o.nz=Math.max(2,Math.ceil(L/o.dzs));
+  const C=carve(g,o), nc=C.nc, nz=C.nz;
+  const cBody=[0.80,0.82,0.85], cSide=[0.66,0.69,0.73],   // steel in both themes, as an STL viewer draws it
+   cG=v3Col('--accent'), cA=v3Col('--warn'), cB=v3Col('--ok'), cLine=v3Col('--text');
+  const P=[],N=[],K=[],I=[]; let nA=0,nB=0,nG=0;
+  const rad=ro=>ro;
+  const vtx=(p,n,c)=>{P.push(p[0],p[1],p[2]);N.push(n[0],n[1],n[2]);K.push(c[0],c[1],c[2]);return P.length/3-1;};
+  const pos=(i,j)=>{const ro=rad(C.RO[i*nc+j]),th=C.TH[j];return [ro*Math.cos(th),ro*Math.sin(th),-C.Z[i]];};
+  // OD surface
+  const base=P.length/3;
+  for(let i=0;i<=nz;i++) for(let j=0;j<nc;j++){
+    const id=i*nc+j, tk=C.TK[id]; let c=cBody;
+    if(tk>=0){ const sh=steep>1e-6?Math.max(0,Math.min(1,(Dfull-C.DD[id])/steep)):0;
+      if((tk===1||tk===3)&&sh>0.02){ c=v3Mix(cG,tk===1?cA:cB,0.6+0.4*sh); if(tk===1)nA++; else nB++; } else { c=cG; nG++; } }
+    const jm=one?Math.max(0,j-1):(j-1+nc)%nc, jp=one?Math.min(nc-1,j+1):(j+1)%nc, im=Math.max(0,i-1), ip=Math.min(nz,i+1);
+    const a=pos(i,jm),b=pos(i,jp),u=pos(im,j),w=pos(ip,j);
+    const tj=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], ti=[w[0]-u[0],w[1]-u[1],w[2]-u[2]];
+    let n=[tj[1]*ti[2]-tj[2]*ti[1],tj[2]*ti[0]-tj[0]*ti[2],tj[0]*ti[1]-tj[1]*ti[0]]; const q=pos(i,j);
+    if(n[0]*q[0]+n[1]*q[1]<0) n=n.map(x=>-x);
+    vtx(q,n,c);
+  }
+  const cols=one?nc-1:nc;
+  for(let i=0;i<nz;i++) for(let j=0;j<cols;j++){const j2=(j+1)%nc,a=base+i*nc+j,b=base+(i+1)*nc+j,c=base+(i+1)*nc+j2,d=base+i*nc+j2;I.push(a,b,c,a,c,d);}
+  // bore, front and back faces (rings), wedge walls
+  const ring=(i,inner)=>{const out=[];for(let j=0;j<nc;j++){const th=C.TH[j];const rr=inner?rb:rad(C.RO[i*nc+j]);out.push([rr*Math.cos(th),rr*Math.sin(th),-C.Z[i]]);}return out;};
+  const strip=(A,B,nA_,nB_,cA_,flip)=>{const s0=P.length/3;for(let j=0;j<nc;j++){vtx(A[j],nA_(j),cA_);vtx(B[j],nB_(j),cA_);}
+    for(let j=0;j<cols;j++){const j2=(j+1)%nc,a=s0+2*j,b=s0+2*j+1,c=s0+2*j2+1,d=s0+2*j2; if(flip)I.push(a,c,b,a,d,c); else I.push(a,b,c,a,c,d);}};
+  const up=()=>[0,0,1], dn=()=>[0,0,-1], inn=j=>[-Math.cos(C.TH[j]),-Math.sin(C.TH[j]),0];
+  strip(ring(0,true),ring(0,false),up,up,cSide,false);
+  strip(ring(nz,true),ring(nz,false),dn,dn,cSide,true);
+  strip(ring(0,true),ring(nz,true),inn,inn,v3Mix(cSide,[0,0,0],0.25),true);
+  if(one) for(const j of [0,nc-1]){const th=C.TH[j], nn=j?[-Math.sin(th),Math.cos(th),0]:[Math.sin(th),-Math.cos(th),0], s0=P.length/3;
+    for(let i=0;i<=nz;i++){vtx([rb*Math.cos(th),rb*Math.sin(th),-C.Z[i]],nn,cSide);vtx(pos(i,j),nn,cSide);}
+    for(let i=0;i<nz;i++){const a=s0+2*i,b=s0+2*i+1,c=s0+2*i+3,d=s0+2*i+2;I.push(a,b,c,a,c,d);}}
+  // ball-tip centre lines, on the same exaggeration, lifted a hair off the floor
+  const LP=[]; const tracks=carveTracks(g,ex), ks=one?[0,1]:[...Array(S.N).keys()];
+  for(const k of ks) tracks.forEach((tr,ti)=>{ if(one&&k===1&&ti!==0) return;
+    for(let i=0;i<tr.length-1;i++) for(const pnt of [tr[i],tr[i+1]]){
+      const z=Math.max(0,Math.min(L,pnt.z)), th=(pnt.x+k*g.w)/R, rr=R-pnt.d+0.0015; LP.push(rr*Math.cos(th),rr*Math.sin(th),-z);} });
+  let bb=[1e9,1e9,1e9,-1e9,-1e9,-1e9]; for(let i=0;i<P.length;i+=3) for(let a=0;a<3;a++){bb[a]=Math.min(bb[a],P[i+a]);bb[a+3]=Math.max(bb[a+3],P[i+a]);}
+  let sR=0; for(let q=0;q<C.RO.length;q++) sR+=C.RO[q];
+  V3.stats={meanR:sR/C.RO.length,verts:P.length/3,tris:I.length/3,rampA:nA,rampB:nB,full:nG,mode:V3.mode,ex,span:one?(o.th1-o.th0)*180/Math.PI:360,lines:LP.length/6,bb,th0:one?o.th0:null,th1:one?o.th1:null};
+  return {P:new Float32Array(P),N:new Float32Array(N),K:new Float32Array(K),I:new Uint32Array(I),L:new Float32Array(LP),lineCol:cLine,bb,mid:one?(o.th0+o.th1)/2:(g.top[0].x+g.w/2)/R};
+}
+function v3Init(){
+  const c=$('#w3d'); let gl=null;
+  try{ gl=c.getContext('webgl2',{antialias:true,preserveDrawingBuffer:true})||c.getContext('webgl',{antialias:true,preserveDrawingBuffer:true}); }catch(e){gl=null;}
+  if(!gl) return;
+  if(!(gl instanceof (window.WebGL2RenderingContext||function(){}))&&!gl.getExtension('OES_element_index_uint')) return;
+  const sh=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;};
+  const prog=(vs,fs)=>{const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p;};
+  try{
+    V3.pSurf=prog(`attribute vec3 p;attribute vec3 n;attribute vec3 c;uniform mat4 M;varying vec3 vn;varying vec3 vc;varying vec3 vp;void main(){vn=n;vc=c;vp=p;gl_Position=M*vec4(p,1.0);}`,
+      `precision mediump float;varying vec3 vn;varying vec3 vc;varying vec3 vp;uniform vec3 E;uniform vec3 K1;void main(){vec3 n=normalize(vn);vec3 v=normalize(E-vp);if(dot(n,v)<0.0)n=-n;
+       float d=max(dot(n,K1),0.0), h=max(dot(n,v),0.0); vec3 hv=normalize(K1+v); float s=pow(max(dot(n,hv),0.0),40.0);
+       gl_FragColor=vec4(vc*(0.30+0.45*d+0.35*h)+vec3(0.18*s),1.0);}`);
+    V3.pLine=prog(`attribute vec3 p;uniform mat4 M;void main(){gl_Position=M*vec4(p,1.0);gl_Position.z-=0.002*gl_Position.w;}`,
+      `precision mediump float;uniform vec3 C;void main(){gl_FragColor=vec4(C,1.0);}`);
+  }catch(e){ console.error('3D view: '+e.message); return; }
+  V3.gl=gl; V3.bufs={p:gl.createBuffer(),n:gl.createBuffer(),k:gl.createBuffer(),i:gl.createBuffer(),l:gl.createBuffer()};
+  $('#wrapbox').closest('.view').classList.add('v3-on');
+}
+function v3Dirty(){ V3.dirty=true; clearTimeout(V3.timer); V3.timer=setTimeout(()=>{ if($('#wrapbox').clientWidth>=40) v3Frame(); },120); }
+function v3Upload(m){
+  const gl=V3.gl,B=V3.bufs;
+  gl.bindBuffer(gl.ARRAY_BUFFER,B.p);gl.bufferData(gl.ARRAY_BUFFER,m.P,gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,B.n);gl.bufferData(gl.ARRAY_BUFFER,m.N,gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,B.k);gl.bufferData(gl.ARRAY_BUFFER,m.K,gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,B.i);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,m.I,gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER,B.l);gl.bufferData(gl.ARRAY_BUFFER,m.L,gl.STATIC_DRAW);
+  V3.nI=m.I.length; V3.nL=m.L.length/3; V3.lineCol=m.lineCol;
+}
+function v3Size(){
+  const box=$('#wrapbox'), c=$('#w3d'), dpr=Math.min(2,window.devicePixelRatio||1), W=box.clientWidth;
+  const H=document.body.classList.contains('cur-3d')?Math.max(240,Math.round(innerHeight-c.getBoundingClientRect().top-(document.body.classList.contains('tabs')?150:20))):Math.round(Math.min(Math.max(W*0.6,300),560));
+  if(c.width!==Math.round(W*dpr)||c.height!==Math.round(H*dpr)){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);c.style.height=H+'px';}
+  return {W,H};
+}
+function v3Fit(){
+  const m=V3.mesh; if(!m) return; const b=m.bb, {W,H}=v3Size();
+  V3.tgt=[(b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2];
+  const rad=0.5*Math.hypot(b[3]-b[0],b[4]-b[1],b[5]-b[2]), half=Math.min(V3.fov/2,Math.atan(Math.tan(V3.fov/2)*W/H));
+  V3.dist=rad/Math.sin(half)*1.05; V3.yaw=m.mid; V3.pitch=V3.mode==='ONE'?0.12:0.35;
+}
+function v3Mat(W,H){
+  const cp=Math.cos(V3.pitch), e=[V3.tgt[0]+V3.dist*cp*Math.cos(V3.yaw),V3.tgt[1]+V3.dist*cp*Math.sin(V3.yaw),V3.tgt[2]+V3.dist*Math.sin(V3.pitch)];
+  const f=[V3.tgt[0]-e[0],V3.tgt[1]-e[1],V3.tgt[2]-e[2]], fl=Math.hypot(...f); f[0]/=fl;f[1]/=fl;f[2]/=fl;
+  let s=[f[1]*1-f[2]*0,f[2]*0-f[0]*1,0]; const sl=Math.hypot(...s)||1; s=s.map(x=>x/sl);
+  const u=[s[1]*f[2]-s[2]*f[1],s[2]*f[0]-s[0]*f[2],s[0]*f[1]-s[1]*f[0]];
+  const near=V3.dist*0.02, far=V3.dist*20, t=1/Math.tan(V3.fov/2), a=W/H;
+  const V=[s[0],u[0],-f[0],0, s[1],u[1],-f[1],0, s[2],u[2],-f[2],0, -(s[0]*e[0]+s[1]*e[1]+s[2]*e[2]),-(u[0]*e[0]+u[1]*e[1]+u[2]*e[2]),(f[0]*e[0]+f[1]*e[1]+f[2]*e[2]),1];
+  const Pm=[t/a,0,0,0, 0,t,0,0, 0,0,(far+near)/(near-far),-1, 0,0,2*far*near/(near-far),0];
+  const M=new Float32Array(16); for(let c=0;c<4;c++) for(let r=0;r<4;r++){let v=0;for(let k=0;k<4;k++) v+=Pm[k*4+r]*V[c*4+k]; M[c*4+r]=v;}
+  return {M,e,s,u,f};
+}
+function v3Frame(){
+  if(!V3.gl||!G) return; if($('#wrapbox').clientWidth<40) return;
+  if(V3.dirty){ V3.mesh=v3Build(G); v3Upload(V3.mesh); V3.dirty=false; if(V3.fitNext){ v3Fit(); V3.fitNext=false; } }
+  v3Draw();
+}
+function v3Draw(){
+  const gl=V3.gl; if(!gl||!V3.mesh) return; const {W,H}=v3Size(), c=$('#w3d');
+  gl.viewport(0,0,c.width,c.height); const bg=v3Col('--viz'); gl.clearColor(bg[0],bg[1],bg[2],1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST);
+  const {M,e,s,u,f}=v3Mat(W,H), B=V3.bufs;
+  const k1=[-f[0]*0.55+u[0]*0.65-s[0]*0.5,-f[1]*0.55+u[1]*0.65-s[1]*0.5,-f[2]*0.55+u[2]*0.65-s[2]*0.5], kl=Math.hypot(...k1);
+  gl.useProgram(V3.pSurf);
+  gl.uniformMatrix4fv(gl.getUniformLocation(V3.pSurf,'M'),false,M); gl.uniform3fv(gl.getUniformLocation(V3.pSurf,'E'),e); gl.uniform3fv(gl.getUniformLocation(V3.pSurf,'K1'),k1.map(x=>x/kl));
+  const att=(prog,name,buf)=>{const l=gl.getAttribLocation(prog,name); if(l<0) return; gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l,3,gl.FLOAT,false,0,0);};
+  att(V3.pSurf,'p',B.p); att(V3.pSurf,'n',B.n); att(V3.pSurf,'c',B.k);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,B.i); gl.drawElements(gl.TRIANGLES,V3.nI,gl.UNSIGNED_INT,0);
+  for(const nm of ['n','c']){const l=gl.getAttribLocation(V3.pSurf,nm); if(l>=0) gl.disableVertexAttribArray(l);}
+  if(V3.lines&&V3.nL){ gl.useProgram(V3.pLine); gl.uniformMatrix4fv(gl.getUniformLocation(V3.pLine,'M'),false,M); gl.uniform3fv(gl.getUniformLocation(V3.pLine,'C'),V3.lineCol);
+    att(V3.pLine,'p',B.l); gl.drawArrays(gl.LINES,0,V3.nL); }
+  $('#w-cap').textContent=V3.mode==='ONE'?`one index · ${V3.stats.span.toFixed(0)}° of ${S.N}`:`${S.N} indexes`;
+}
+function v3Req(){ if(V3.raf) return; V3.raf=requestAnimationFrame(()=>{V3.raf=0; v3Draw();}); }
+function v3Wire(){
+  const c=$('#w3d'), PT=new Map(); let g0=null, lastTap=0;
+  const pan=(dx,dy)=>{const {H}=v3Size(), k=2*V3.dist*Math.tan(V3.fov/2)/H, {s,u}=v3Mat(1,1); for(let a=0;a<3;a++) V3.tgt[a]+=(-dx*s[a]+dy*u[a])*k;};
+  const two=()=>{const [a,b]=[...PT.values()];return {d:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};};
+  c.addEventListener('pointerdown',e=>{ c.setPointerCapture(e.pointerId); PT.set(e.pointerId,{x:e.clientX,y:e.clientY,b:e.button,sh:e.shiftKey}); c.style.cursor='grabbing';
+    if(PT.size===2) g0=two();
+    if(PT.size===1&&e.pointerType!=='mouse'){ const t=performance.now(); if(t-lastTap<320){ v3Fit(); v3Req(); lastTap=0; } else lastTap=t; } });
+  c.addEventListener('pointermove',e=>{ const p=PT.get(e.pointerId); if(!p) return; const dx=e.clientX-p.x, dy=e.clientY-p.y;
+    if(PT.size===1){ if(p.b===2||p.b===1||p.sh) pan(dx,dy); else { V3.yaw-=dx*0.008; V3.pitch=Math.max(-1.52,Math.min(1.52,V3.pitch+dy*0.008)); } p.x=e.clientX; p.y=e.clientY; if(Math.hypot(dx,dy)>2) lastTap=0; v3Req(); return; }
+    p.x=e.clientX; p.y=e.clientY; if(PT.size===2&&g0){ const g1=two(); if(g1.d>10&&g0.d>10) V3.dist*=g0.d/g1.d; pan(g1.x-g0.x,g1.y-g0.y); g0=g1; lastTap=0; v3Req(); } });
+  const up=e=>{ PT.delete(e.pointerId); if(PT.size<2) g0=null; if(!PT.size) c.style.cursor='grab'; };
+  c.addEventListener('pointerup',up); c.addEventListener('pointercancel',up);
+  c.addEventListener('contextmenu',e=>e.preventDefault());
+  c.addEventListener('dblclick',()=>{ v3Fit(); v3Req(); });
+  c.addEventListener('wheel',e=>{ e.preventDefault(); V3.dist*=Math.exp(Math.max(-0.5,Math.min(0.5,e.deltaY*0.0015))); v3Req(); },{passive:false});
+  document.querySelectorAll('[data-v3]').forEach(b=>b.addEventListener('click',()=>{ V3.mode=b.dataset.v3; V3.fitNext=true;
+    document.querySelectorAll('[data-v3]').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); V3.dirty=true; v3Frame(); }));
+  document.querySelectorAll('[data-v3x]').forEach(b=>b.addEventListener('click',()=>{ V3.ex=+b.dataset.v3x;
+    document.querySelectorAll('[data-v3x]').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); V3.dirty=true; v3Frame(); }));
+  $('#v3-lines').addEventListener('click',e=>{ V3.lines=!V3.lines; e.currentTarget.setAttribute('aria-pressed',String(V3.lines)); v3Req(); });
+  $('#v3-fit').addEventListener('click',()=>{ v3Fit(); v3Req(); });
+}
+v3Init(); if(V3.gl) v3Wire();
+window.IBD3D={V3,fit:()=>{v3Fit();v3Draw();},frame:v3Frame,draw:v3Draw,mat:v3Mat,
+  pixel:(fx,fy)=>{const gl=V3.gl,c=$('#w3d'),o=new Uint8Array(4);gl.readPixels(Math.round(fx*(c.width-1)),Math.round((1-fy)*(c.height-1)),1,1,gl.RGBA,gl.UNSIGNED_BYTE,o);return [...o];},
+  lit:()=>{const gl=V3.gl,c=$('#w3d'),o=new Uint8Array(c.width*c.height*4);gl.readPixels(0,0,c.width,c.height,gl.RGBA,gl.UNSIGNED_BYTE,o);const bg=v3Col('--viz').map(x=>Math.round(x*255));let n=0;for(let i=0;i<o.length;i+=4) if(Math.abs(o[i]-bg[0])+Math.abs(o[i+1]-bg[1])+Math.abs(o[i+2]-bg[2])>30) n++;return n/(c.width*c.height);}};
 
 /* ── readout ── */
 const STEPS=[{k:'botA',tr:'A',slot:'bottom',back:'up',gd:'gBot'},{k:'topB',tr:'B',slot:'top',back:'down',gd:'gTop'},
@@ -1192,6 +1378,47 @@ W:[[0,6,1,0,2,4,3,0,4,6]],X:[[0,0,4,6],[0,6,4,0]],Y:[[0,6,2,3,4,6],[2,3,2,0]],Z:
 '9':[[4,3,1,3,0,4,0,5,1,6,3,6,4,5,4,1,3,0,1,0]],'-':[[1,3,3,3]],'.':[[2,0,2,0.4]],'_':[[0,0,4,0]],'/':[[0,0,4,6]],' ':[]};
 const ADV=6;
 
+/* ── the carve: every groove as balls along its centre line (the same model as mesh.py) ──
+   ONE implementation for the STL and the 3D view, so the view cannot show a different part.
+   Full turn (default): nth columns round the whole barrel, periodic. A WINDOW (o.th0, o.th1) is an
+   unwrapped arc of nth+1 columns, carved by the indexes in o.ks only (the one-index view).
+   Per cell: RO = surface radius, TK = the track that cut it deepest (-1 none, 0 top slot, 1 A,
+   2 bottom slot, 3 B), DD = that ball's groove depth, so a ramp can be coloured by how shallow it is. */
+function carveTracks(g,ex){
+  const r=S.ball/2, L=g.L;
+  const tr=[[{x:g.top[0].x,z:-r-0.01,d:S.rows.top.d},{x:g.top[1].x,z:g.top[1].z,d:S.rows.top.d}],g.A,
+          [{x:g.bot[0].x,z:g.bot[0].z,d:S.rows.bot.d},{x:g.bot[0].x,z:L+r+0.01,d:S.rows.bot.d}],g.B];
+  if(!ex||ex===1) return tr;
+  // VIEW ONLY: exaggerate each node's rise above full depth, so a .010 ramp can be seen. Never exported.
+  const F=Math.max(S.rows.top.d,S.rows.bot.d);
+  return tr.map(t=>t.map(p=>({...p,d0:p.d,d:Math.max(0,F-(F-p.d)*ex)})));
+}
+function carve(g,o){
+  const R=S.D/2, r=S.ball/2, L=g.L, nth=o.nth, dzs=o.dzs, nz=o.nz, win=o.th0!==undefined;
+  const th0=win?o.th0:0, span=win?o.th1-o.th0:2*Math.PI, nc=win?nth+1:nth, dth=span/nth;
+  const TH=Float64Array.from({length:nc},(_,j)=>win?th0+j*dth:j*2*Math.PI/nth), Z=Float64Array.from({length:nz+1},(_,i)=>i*L/nz);
+  const RO=new Float64Array((nz+1)*nc).fill(R), TK=new Int8Array((nz+1)*nc).fill(-1), DD=new Float32Array((nz+1)*nc);
+  const tracks=carveTracks(g,o.ex), ks=o.ks||[...Array(S.N).keys()], only=o.only;
+  const ds=Math.min(dzs,2*Math.PI*R/nth)*0.5, dthMax=Math.asin(Math.min(1,r/(R-r)))+2*Math.PI/nth;
+  for(const k of ks) for(let ti=0;ti<tracks.length;ti++){ if(only&&!only(k,ti)) continue; const tr=tracks[ti];
+   for(let i=0;i<tr.length-1;i++){
+    const a=tr[i],b=tr[i+1],len=Math.hypot(b.x-a.x,b.z-a.z),m=Math.max(1,Math.ceil(len/ds));
+    for(let q=0;q<=m;q++){
+      const f=q/m, x=a.x+(b.x-a.x)*f+k*g.w, zc=a.z+(b.z-a.z)*f, d=a.d+(b.d-a.d)*f, rc=R-d+r, thc=x/R;
+      const dt=a.d0===undefined?d:a.d0+(b.d0-a.d0)*f;
+      const i0=Math.max(0,Math.floor((zc-r)/L*nz)),i1=Math.min(nz,Math.ceil((zc+r)/L*nz));
+      let j0,j1;
+      if(win){ j0=Math.max(0,Math.floor((thc-dthMax-th0)/dth)); j1=Math.min(nth,Math.ceil((thc+dthMax-th0)/dth)); }
+      else { j0=Math.floor((thc-dthMax)/(2*Math.PI)*nth); j1=Math.ceil((thc+dthMax)/(2*Math.PI)*nth); }
+      for(let ii=i0;ii<=i1;ii++){const dz2=(Z[ii]-zc)**2; if(dz2>=r*r) continue;
+        for(let jj=j0;jj<=j1;jj++){const j=win?jj:((jj%nth)+nth)%nth; let dd=TH[j]-thc; dd=Math.atan2(Math.sin(dd),Math.cos(dd));
+          const disc=r*r-dz2-(rc*Math.sin(dd))**2; if(disc<=0) continue;
+          const ent=rc*Math.cos(dd)-Math.sqrt(disc), id=ii*nc+j; if(ent<RO[id]){RO[id]=ent;TK[id]=ti;DD[id]=dt;}}}
+    }
+   }
+  }
+  return {TH,Z,RO,TK,DD,nth,nc,nz,win};
+}
 /* ── STL: OD height field + bore + back face + front face with the revision recessed ──
    Model: part axis Z, front face at z=0, part in z ∈ [−L, 0]. Written in MILLIMETRES × print scale. */
 function textLayout(rev,scale,rb,rFloor,R,stroke,depthMM,centre){
@@ -1223,24 +1450,7 @@ function buildSTL(opt){
   const rb=S.D/2-(Dmax+WALL);
   if(rb<=0.01) return {ok:false,why:'No bore fits with a .100 wall at this ball size, so there is no part to print.'};
   const fine=opt.q==='f', nth=fine?1440:720, dzs=fine?0.0025:0.005, nz=Math.max(2,Math.ceil(L/dzs));
-  const TH=Float64Array.from({length:nth},(_,j)=>j*2*Math.PI/nth), Z=Float64Array.from({length:nz+1},(_,i)=>i*L/nz);
-  const RO=new Float64Array((nz+1)*nth).fill(R);
-  // every groove of every index, as balls along its centre line (the same model as mesh.py)
-  const tracks=[[{x:g.top[0].x,z:-r-0.01,d:S.rows.top.d},{x:g.top[1].x,z:g.top[1].z,d:S.rows.top.d}],g.A,
-                [{x:g.bot[0].x,z:g.bot[0].z,d:S.rows.bot.d},{x:g.bot[0].x,z:L+r+0.01,d:S.rows.bot.d}],g.B];
-  const ds=Math.min(dzs,2*Math.PI*R/nth)*0.5, dthMax=Math.asin(Math.min(1,r/(R-r)))+2*Math.PI/nth;
-  for(let k=0;k<S.N;k++) for(const tr of tracks) for(let i=0;i<tr.length-1;i++){
-    const a=tr[i],b=tr[i+1],len=Math.hypot(b.x-a.x,b.z-a.z),m=Math.max(1,Math.ceil(len/ds));
-    for(let q=0;q<=m;q++){
-      const f=q/m, x=a.x+(b.x-a.x)*f+k*g.w, zc=a.z+(b.z-a.z)*f, d=a.d+(b.d-a.d)*f, rc=R-d+r, thc=x/R;
-      const i0=Math.max(0,Math.floor((zc-r)/L*nz)),i1=Math.min(nz,Math.ceil((zc+r)/L*nz));
-      const j0=Math.floor((thc-dthMax)/(2*Math.PI)*nth),j1=Math.ceil((thc+dthMax)/(2*Math.PI)*nth);
-      for(let ii=i0;ii<=i1;ii++){const dz2=(Z[ii]-zc)**2; if(dz2>=r*r) continue;
-        for(let jj=j0;jj<=j1;jj++){const j=((jj%nth)+nth)%nth; let dd=TH[j]-thc; dd=Math.atan2(Math.sin(dd),Math.cos(dd));
-          const disc=r*r-dz2-(rc*Math.sin(dd))**2; if(disc<=0) continue;
-          const ent=rc*Math.cos(dd)-Math.sqrt(disc), id=ii*nth+j; if(ent<RO[id]) RO[id]=ent;}}
-    }
-  }
+  const CV=carve(g,{nth,nz,dzs}), TH=CV.TH, Z=CV.Z, RO=CV.RO;
   let rFloor=R; for(let j=0;j<nth;j++) rFloor=Math.min(rFloor,RO[j]);
   const TX=textLayout(opt.rev,opt.scale,rb,rFloor,R,opt.stroke,opt.depth,opt.centre);
   const s=25.4*opt.scale, tris=[];
@@ -1497,8 +1707,9 @@ $('#copy-dxf').addEventListener('click',()=>{
   const fallback=()=>{const d=document.querySelector('details');d.open=true;const r=document.createRange();r.selectNodeContents($('#dxf'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);st.textContent='Selected';st.style.color='var(--warn)';};
   try{navigator.clipboard.writeText(txt).then(()=>{st.textContent='Copied';st.style.color='var(--ok)';},fallback);}catch(err){fallback();}
 });
-new ResizeObserver(()=>{if(G)drawWrap(G);}).observe($('#wrapbox'));
+new ResizeObserver(()=>{if(!G)return; if(V3.gl) v3Frame(); else drawWrap(G);}).observe($('#wrapbox'));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>G&&drawWrap(G));
+addEventListener('resize',()=>{if(V3.gl&&G) v3Frame();});
 new MutationObserver(()=>G&&drawWrap(G)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
 T.A.mode='POINTS'; T.B.mode='POINTS'; fitTrack('A'); fitTrack('B');
@@ -1556,7 +1767,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (618ac016b7b9) */
+<script>/* installable build (5e56de353b1e) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
