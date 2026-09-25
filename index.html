@@ -245,22 +245,30 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
 @media (max-width:820px){ .app-grid{grid-template-columns:1fr;} }
 /* ── TABLET LAYOUT: one section per tab; the PATH tab never scrolls, so a drag cannot move the page ── */
 #tabs{display:none;}
-body.tabs #tabs{display:flex;position:sticky;top:0;z-index:5;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line2);overflow-x:auto;}
+body.tabs #tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:5;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom, 0px));background:var(--panel);border-top:1px solid var(--line2);overflow-x:auto;}
 #tabs button{flex:1 0 auto;min-height:46px;padding:0 14px;font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.08em;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:6px;cursor:pointer;}
 #tabs button[aria-selected="true"]{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-line);}
 #tabs .lay{flex:0 0 auto;color:var(--dim);font-weight:400;}
 body.tabs{margin:0;}
-body.tabs .wrap{max-width:none;padding:8px 10px 14px;gap:8px;}
+body.tabs .wrap{max-width:none;padding:8px 10px calc(72px + env(safe-area-inset-bottom, 0px));gap:8px;}
 body.tabs header,body.tabs .intro,body.tabs .tile-head{display:none;}
 body.tabs [data-tab]:not(.tab-on){display:none !important;}
 body.tabs .tile{padding:8px;gap:8px;}
 body.tabs .views{display:block;}
 body.tabs.cur-path{overflow:hidden;height:100dvh;overscroll-behavior:none;}
 html:has(body.tabs.cur-path){overflow:hidden;overscroll-behavior:none;}
-body.tabs.cur-path #unrolled{height:max(240px,calc(100dvh - 250px));touch-action:none;}
+body.tabs.cur-path #unrolled{height:max(240px,calc(100dvh - 285px));touch-action:none;}
 body.tabs.cur-path .readout{display:flex;overflow-x:auto;gap:6px;padding-bottom:2px;}
 body.tabs.cur-path .readout .ro{flex:0 0 auto;min-width:150px;}
 body.tabs #wrap{touch-action:pan-y;}
+/* PATH views (tablet layout): A and B edit one path each, BOTH only looks. Swipe left steps A > B > BOTH */
+.pv-seg,.pv-hint{display:none;}
+body.tabs .pv-seg{display:inline-flex;} body.tabs .pv-hint{display:inline;color:var(--dim);}
+body.tabs .pv-seg button{min-height:32px;padding:0 12px;}
+@media (max-width:700px){ body.tabs .view-h>span:first-child{display:none;} body.tabs .legend>span:not(.pv-hint){display:none;} }
+body.tabs.pv-A .hb,body.tabs.pv-A .lane-B,body.tabs.pv-B .ha,body.tabs.pv-B .lane-A,
+body.tabs.pv-ALL .ha,body.tabs.pv-ALL .hb,body.tabs.pv-ALL .lane-A,body.tabs.pv-ALL .lane-B{display:none;}
+body.tabs.pv-A #unrolled .tb,body.tabs.pv-B #unrolled .ta{opacity:.22;}
 body.tabs .sl input[type=range]{min-height:34px;}
 body.tabs .seg button{min-height:36px;}
 @media (min-width:900px){ body.tabs .shapes{grid-template-columns:1fr 1fr;} }
@@ -364,13 +372,14 @@ body.tabs .seg button{min-height:36px;}
 
     <div class="views">
       <div class="view" data-tab="path">
-        <div class="view-h"><span>Unrolled · the DXF frame</span><b id="u-cap"></b></div>
+        <div class="view-h"><span>Unrolled · the DXF frame</span><div class="pv-seg seg" role="group" aria-label="Path view"><button type="button" data-pv="A">A PATH</button><button type="button" data-pv="B">B PATH</button><button type="button" data-pv="ALL">BOTH</button></div><b id="u-cap"></b></div>
         <svg id="unrolled" role="img" aria-label="Unrolled groove path for one index with the neighbouring indexes shown faintly"></svg>
         <div class="view-f legend">
           <span><i class="sw" style="background:var(--accent)"></i>this index</span>
           <span><i class="sw" style="background:var(--ghost)"></i>neighbours</span>
           <span><i class="sw" style="background:var(--warn)"></i>A shallower than full</span>
           <span><i class="sw" style="background:var(--ok)"></i>B shallower than full</span>
+          <span class="pv-hint">swipe ← next view · pinch to zoom · double-tap to fit</span>
         </div>
       </div>
       <div class="view" data-tab="3d">
@@ -742,7 +751,7 @@ function checks(g){
 function drawUnrolled(g){
   const w=g.w,L=g.L,span=Math.max(3*w,L*1.25);
   const pl=span*0.12,pr=span*0.03,pt=span*0.1,pb=span*0.1,fs=span*0.026;
-  const lg=span*0.05,lw=span*0.42;   // v6: a Z rail lane each side — A on the left, B right of NEXT
+  const lg=span*0.05,lw=span*(document.body.classList.contains('tabs')?0.3:0.42);   // a narrower rail on a tablet/phone, so the path gets the width   // v6: a Z rail lane each side — A on the left, B right of NEXT
   const vx=-w-pl-lw-lg*0.5,vy=-pt,vw=3*w+pl+pr+1.5*lg+2*lw,vh=L+pt+pb;
   const pts=(a,dx)=>a.map(p=>`${(p.x+dx).toFixed(5)},${p.z.toFixed(5)}`).join(' ');
   let s=`<defs><clipPath id="stk"><rect x="${-w}" y="0" width="${3*w}" height="${L}"/></clipPath></defs>`;
@@ -754,29 +763,30 @@ function drawUnrolled(g){
   s+=`<g clip-path="url(#stk)">`;
   for(const k of [-1,1,0]){
     const dx=k*g.w, gh=k!==0?' gh':'';
-    for(const tr of [[g.top[0].x===0?[{x:0,z:-S.ball},...g.top.slice(1)]:g.top],[g.A],[[...g.bot,{x:g.bot[0].x,z:L+S.ball}]],[g.B]]){
-      s+=`<polyline class="u-band${gh}" stroke-width="${S.ball}" points="${pts(tr[0],dx)}"/>`;
-    }
-    for(const tr of [g.top,g.A,g.bot,g.B]) s+=`<polyline class="u-cl${gh}" points="${pts(tr,dx)}"/>`;
+    const tt=['','',' ta','',' tb'];   // this index's A and B are tagged so a PATH view can fade one
+    [[g.top[0].x===0?[{x:0,z:-S.ball},...g.top.slice(1)]:g.top],[g.A],[[...g.bot,{x:g.bot[0].x,z:L+S.ball}]],[g.B]].forEach((tr,i)=>{
+      s+=`<polyline class="u-band${gh}${k?'':tt[i+1]}" stroke-width="${S.ball}" points="${pts(tr[0],dx)}"/>`;
+    });
+    [g.top,g.A,g.bot,g.B].forEach((tr,i)=>{ s+=`<polyline class="u-cl${gh}${k?'':tt[i+1]}" points="${pts(tr,dx)}"/>`; });
   }
   s+='<!--BANDS-->';   // v8: each rail's zones, shaded along its own groove only (filled in by rail())
   // shallow part of A, this index only
   let run=[];
-  let scls='';
+  let scls=' ta';
   const flush=()=>{if(run.length>1)s+=`<polyline class="u-shallow${scls}" points="${pts(run,0)}"/>`;run=[];};
   for(const p of g.A){ if(p.d<FULLD()-1e-4) run.push(p); else flush(); } flush();
-  scls=' b'; for(const p of g.B){ if(p.d<FULLD()-1e-4) run.push(p); else flush(); } flush();
+  scls=' b tb'; for(const p of g.B){ if(p.d<FULLD()-1e-4) run.push(p); else flush(); } flush();
   s+=`</g>`;
   s+=`<rect class="u-frame" x="0" y="0" width="${w}" height="${L}"/>`;
   // nodes
   const lab=(p,t,lk,left)=>{s+=`<circle class="u-node${lk?' lk':''}" cx="${p.x}" cy="${p.z}" r="${S.ball*0.11}"/>`;s+=`<text class="u-txt acc" x="${p.x+(left?-1:1)*S.ball*0.2}" y="${p.z-S.ball*0.18}" font-size="${fs*0.85}" text-anchor="${left?'end':'start'}">${t}</text>`;};
   // in SLIDERS mode the nodes are generated and dense: label every fifth and the end only
   const every=(tr,len,i)=>T[tr].mode!=='SLIDERS'||(i+1)%5===0||i===len-1;
-  S.rows.A.forEach((n,i)=>{ if(every('A',S.rows.A.length,i)) lab(g.An[i+1],'A'+(i+1),false,T.A.mode==='SLIDERS'||i%2===1); else s+=`<circle class="u-node" cx="${g.An[i+1].x}" cy="${g.An[i+1].z}" r="${S.ball*0.07}"/>`; });
-  S.rows.B.forEach((n,i)=>{ if(every('B',S.rows.B.length,i)) lab(g.Bn[i+1],'B'+(i+1)); else s+=`<circle class="u-node" cx="${g.Bn[i+1].x}" cy="${g.Bn[i+1].z}" r="${S.ball*0.07}"/>`; });
-  lab(g.An[0],'',true); lab(g.bot[0],'S',true); lab(g.Bn[g.Bn.length-1],'',true);
+  s+='<g class="ta">'; S.rows.A.forEach((n,i)=>{ if(every('A',S.rows.A.length,i)) lab(g.An[i+1],'A'+(i+1),false,T.A.mode==='SLIDERS'||i%2===1); else s+=`<circle class="u-node" cx="${g.An[i+1].x}" cy="${g.An[i+1].z}" r="${S.ball*0.07}"/>`; });
+  s+='</g><g class="tb">'; S.rows.B.forEach((n,i)=>{ if(every('B',S.rows.B.length,i)) lab(g.Bn[i+1],'B'+(i+1)); else s+=`<circle class="u-node" cx="${g.Bn[i+1].x}" cy="${g.Bn[i+1].z}" r="${S.ball*0.07}"/>`; });
+  s+='</g>'; lab(g.An[0],'',true); lab(g.bot[0],'S',true); lab(g.Bn[g.Bn.length-1],'',true);
   // v4: the four junction points you can drag
-  const hd=(x,z,h,title)=>{s+=`<circle class="u-drag" data-h="${h}" cx="${x}" cy="${z}" r="${S.ball*0.2*HIT}"><title>${title}</title></circle>`;};
+  const hd=(x,z,h,title)=>{s+=`<circle class="u-drag ${h==='top'||h==='aend'?'ha':'hb'}" data-h="${h}" cx="${x}" cy="${z}" r="${S.ball*0.2*HIT}"><title>${title}</title></circle>`;};
   hd(g.top[1].x,g.top[1].z,'top','Top junction: drag to move the top slot end and the A/B split');
   hd(g.Bn[g.Bn.length-1].x,g.Bn[g.Bn.length-1].z,'topn','The same top junction, one index over');
   hd(g.bot[0].x,g.bot[0].z,'bot','Bottom slot top: drag to move it');
@@ -785,10 +795,12 @@ function drawUnrolled(g){
   for(const trn of ['A','B']){
     const P=T[trn]; if(P.mode!=='SLIDERS'||!P.st||!P.st.ok) continue;
     const c=P.st;
+    s+=`<g class="${trn==='A'?'ta ha':'tb hb'}">`;
     s+=`<polyline class="u-con" points="${c.P0.x},${c.P0.z} ${c.K.x},${c.K.z} ${c.P1.x},${c.P1.z}"/>`;
     if(c.Reff>1e-6) for(const q of [c.T1,c.T2]) s+=`<circle class="u-tan" cx="${q.x}" cy="${q.z}" r="${S.ball*0.06}"/>`;
     s+=`<circle class="u-knee" data-knee="${trn}" cx="${c.K.x}" cy="${c.K.z}" r="${S.ball*0.17*HIT}"><title>Drag to move the ${trn} knee</title></circle>`;
     s+=`<text class="u-txt" x="${c.K.x+(trn==='A'?-1:1)*S.ball*0.3}" y="${c.K.z+S.ball*0.05}" font-size="${fs*0.78}" text-anchor="${trn==='A'?'end':'start'}">${trn} R${c.Reff.toFixed(3).replace(/^0/,'')}</text>`;
+    s+='</g>';
   }
   // v6: TWO Z RAILS, one per stroke, on the part's own Z. A's sits left of the chart beside its
   // groove, B's right of NEXT. Each shows that stroke's ramp window, its step, and which end is
@@ -818,7 +830,7 @@ function drawUnrolled(g){
       // three zones along the stroke: DEEP (full depth) to one handle, RAMP between the handles,
       // FLOOR (the step's depth) from the other handle to the shallow end
       const bot=P.dir==='bot', fl=bot?[zb,z1]:[z0,za], dp=bot?[z0,za]:[zb,z1]; zStep=bot?z1:z0;
-      const gb=(lo,hi,cls)=>{ if(hi>lo) for(const run of zclip(trk,lo,hi)) bands+=`<polyline class="u-gband ${cls}${b}" stroke-width="${S.ball*1.25}" points="${pts(run,0)}"/>`; };
+      const gb=(lo,hi,cls)=>{ if(hi>lo) for(const run of zclip(trk,lo,hi)) bands+=`<polyline class="u-gband ${cls}${b} ${tr==='A'?'ta':'tb'}" stroke-width="${S.ball*1.25}" points="${pts(run,0)}"/>`; };
       gb(za,zb,'ramp'); gb(fl[0],fl[1],'fl');
       for(const z of [za,zb]) s+=`<line class="u-rguide${b}" x1="${sg>0?-w:xp1}" y1="${z}" x2="${sg>0?xp1:2*w}" y2="${z}"/>`;
       s+=`<line class="u-rail" x1="${xr}" y1="0" x2="${xr}" y2="${L}"/>`;
@@ -856,7 +868,14 @@ function drawUnrolled(g){
     rh(xr,zb,tr+'-lo','ns',P.dir==='bot'?tR:tD);
     rh(xp0+sg*P.step*sd,zStep,tr+'-st','ew',`${tr} one-way step: drag outward for a deeper step.`);
   };
-  rail('A',-w-pl,-1); rail('B',2*w+lg,1);
+  s+='<g class="lane-A">'; rail('A',-w-pl,-1); s+='</g><g class="lane-B">'; rail('B',2*w+lg,1); s+='</g>';
+  // v9: the frame each PATH view zooms to — A with its rail, B with its rail, BOTH the two paths alone
+  {
+    const m=S.ball*1.2, ax=g.A.map(p=>p.x), bx=g.B.map(p=>p.x), y0=-pt, y1=L+pb;
+    const box=(x0,x1)=>({x:x0,y:y0,w:x1-x0,h:y1-y0});
+    FITS={FULL:{x:vx,y:vy,w:vw,h:vh}, A:box(-w-pl-lw-fs*2.2,Math.max(...ax)+m), B:box(Math.min(...bx)-m,2*w+lg+lw+fs*2.2),   // fs: the rail's labels overhang its lane
+          ALL:box(Math.min(...ax,...bx)-m,Math.max(...ax,...bx)+m)};
+  }
   // labels
   const tx=(x,y,t,cls,anchor,size)=>{s+=`<text class="u-txt ${cls||''}" x="${x}" y="${y}" font-size="${size||fs}" text-anchor="${anchor||'middle'}">${t}</text>`;};
   tx(w/2,-pt*0.62,`ONE INDEX · ${g.pitch.toFixed(2)}° · ${f4(w)}" ARC AT Ø${S.D.toFixed(3)}`,'acc','middle',fs*0.9);
@@ -866,7 +885,7 @@ function drawUnrolled(g){
   for(let z=0;z<=L+1e-6;z+=zstep) tx(-w-fs*0.35,z+fs*0.3,z.toFixed(1),'','end',fs*0.8);
   tx(-w-fs*0.35,L+fs*0.3,f4(L),'acc','end',fs*0.8);
   s=s.replace('<!--BANDS-->',bands);
-  const svg=$('#unrolled'); svg.setAttribute('viewBox',`${vx} ${vy} ${vw} ${vh}`); svg.innerHTML=s;
+  const svg=$('#unrolled'); svg.innerHTML=s; applyView();
   $('#u-cap').textContent=`${S.N} × Ø${S.D.toFixed(3)}`;
 }
 
@@ -1345,6 +1364,26 @@ document.querySelectorAll('.shape .seg button[data-mode]').forEach(b=>b.addEvent
   else { fitTrack(tr); update(); }
 }));
 document.querySelectorAll('[data-fit]').forEach(b=>b.addEventListener('click',()=>{ fitTrack(b.dataset.fit); update(); }));
+/* v9: PATH VIEWS for the tablet layout. PV is which path is being edited; ZV is the two-finger zoom
+   on top of that view's fit frame. The page layout keeps the whole drawing, untouched. */
+var FITS=null; let PV='A'; const ZV={z:1,cx:null,cy:null};
+const PVS=['A','B','ALL'];
+function applyView(){
+  const svg=$('#unrolled'); if(!FITS) return;
+  const F=FITS.FULL;
+  if(!document.body.classList.contains('tabs')){ svg.setAttribute('viewBox',`${F.x} ${F.y} ${F.w} ${F.h}`); return; }
+  const B=FITS[PV], w=B.w/ZV.z, h=B.h/ZV.z, cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const cx=cl(ZV.cx??B.x+B.w/2,F.x,F.x+F.w), cy=cl(ZV.cy??B.y+B.h/2,F.y,F.y+F.h);
+  svg.setAttribute('viewBox',`${cx-w/2} ${cy-h/2} ${w} ${h}`);
+}
+function setPV(v){
+  PV=PVS.includes(v)?v:'A'; ZV.z=1; ZV.cx=ZV.cy=null; kdrag=null; hdrag=null;
+  const bc=document.body.classList; for(const p of PVS) bc.toggle('pv-'+p,p===PV);
+  document.querySelectorAll('[data-pv]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pv===PV)));
+  applyView();
+}
+document.querySelectorAll('[data-pv]').forEach(x=>x.addEventListener('click',()=>setPV(x.dataset.pv)));
+window.IBDVIEW={setPV,applyView,redraw:()=>render(),get pv(){return PV;},zoom:ZV};
 /* drag a knee in the unrolled view */
 const usvg=$('#unrolled'); let kdrag=null;
 let hdrag=null; var RAIL={A:{xp0:0,sd:1,sg:-1},B:{xp0:0,sd:1,sg:1}};
@@ -1392,6 +1431,45 @@ usvg.addEventListener('pointermove',e=>{
   update();
 });
 const kend=()=>{kdrag=null;hdrag=null;}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
+/* v9 gestures, tablet layout only: one finger off a handle SWIPES between views; two fingers PINCH to
+   zoom and pan (a second finger ends any handle drag); a double-tap fits the view again. */
+{
+  const PTR=new Map(); let pinch=null, swipe=null, lastTap=null;
+  const tabs=()=>document.body.classList.contains('tabs');
+  const svgPt=(x,y)=>{const p=usvg.createSVGPoint(); p.x=x; p.y=y; return p.matrixTransform(usvg.getScreenCTM().inverse());};
+  const two=()=>{const [a,b]=[...PTR.values()]; return {d:Math.hypot(a.x-b.x,a.y-b.y)||1, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};};
+  usvg.addEventListener('pointerdown',e=>{
+    if(!tabs()) return;
+    PTR.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    try{ usvg.setPointerCapture(e.pointerId); }catch(err){}
+    if(PTR.size===2){ kdrag=null; hdrag=null; swipe=null; const t=two(); pinch={d0:t.d,z0:ZV.z,P:svgPt(t.mx,t.my)}; }
+    else if(PTR.size===1){ const ds=e.target.dataset||{}; swipe=(ds.h||ds.knee||(e.target.closest&&e.target.closest('[data-flip]')))?null:{x:e.clientX,y:e.clientY,t:performance.now()}; }
+  });
+  usvg.addEventListener('pointermove',e=>{
+    if(!PTR.has(e.pointerId)) return;
+    PTR.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(!pinch||PTR.size!==2) return;
+    const t=two(), B=FITS[PV], r=usvg.getBoundingClientRect();
+    ZV.z=Math.max(1,Math.min(10,pinch.z0*t.d/pinch.d0));
+    const upp=Math.max(B.w/ZV.z/r.width,B.h/ZV.z/r.height);
+    ZV.cx=pinch.P.x-(t.mx-(r.left+r.width/2))*upp; ZV.cy=pinch.P.y-(t.my-(r.top+r.height/2))*upp;
+    applyView();
+  });
+  const end=e=>{
+    if(!PTR.has(e.pointerId)) return;
+    PTR.delete(e.pointerId);
+    if(pinch){ if(!PTR.size) pinch=null; return; }
+    if(!swipe||e.type==='pointercancel'){ swipe=null; return; }
+    const dx=e.clientX-swipe.x, dy=e.clientY-swipe.y, dt=performance.now()-swipe.t; swipe=null;
+    if(Math.abs(dx)>60&&Math.abs(dx)>1.5*Math.abs(dy)&&dt<900){ const i=PVS.indexOf(PV); setPV(PVS[(i+(dx<0?1:PVS.length-1))%PVS.length]); lastTap=null; return; }
+    if(Math.hypot(dx,dy)<10&&dt<300){
+      const now=performance.now();
+      if(lastTap&&now-lastTap.t<350&&Math.hypot(e.clientX-lastTap.x,e.clientY-lastTap.y)<30){ ZV.z=1; ZV.cx=ZV.cy=null; applyView(); lastTap=null; }
+      else lastTap={t:now,x:e.clientX,y:e.clientY};
+    }
+  };
+  usvg.addEventListener('pointerup',end); usvg.addEventListener('pointercancel',end);
+}
 const tbody=$('#chart tbody');
 tbody.addEventListener('change',e=>{const t=e.target; if(!t.dataset.end) return; const v=parseFloat(t.value); if(!isFinite(v)) return;
   if(t.dataset.end==='z') T.A.end.z=v/zs(); T.A.fitErr=null; update();});
@@ -1469,6 +1547,7 @@ function go(t){
 function layout(tabs){
   b.classList.toggle('tabs',tabs); store('ibd-layout',tabs?'tabs':'page');
   if(tabs) go(store('ibd-tab')||'path'); else { clearCur(); document.querySelectorAll('.tab-on').forEach(e=>e.classList.remove('tab-on')); }
+  if(window.IBDVIEW){ IBDVIEW.redraw(); if(tabs) IBDVIEW.setPV('A'); else IBDVIEW.applyView(); }
 }
 document.querySelectorAll('#tabs [data-go]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.go)));
 document.querySelectorAll('[data-layout]').forEach(x=>x.addEventListener('click',()=>layout(x.dataset.layout==='tabs')));
@@ -1477,7 +1556,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (4aade98fbba4) */
+<script>/* installable build (618ac016b7b9) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
