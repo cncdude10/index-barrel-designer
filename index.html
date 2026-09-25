@@ -336,14 +336,16 @@ body.tabs .seg button{min-height:36px;}
       </div>
       <div class="row">
         <div class="fld"><label for="c-rpm">RPM</label><input id="c-rpm" type="number" value="3973" step="10"></div>
-        <div class="fld"><label for="c-feed">Feed</label><input id="c-feed" type="number" value="2.0" step="0.1"><span class="lbl">ipm</span></div>
-        <div class="fld"><label for="c-plunge">Plunge</label><input id="c-plunge" type="number" value="0.5" step="0.1"><span class="lbl">ipm</span></div>
+        <div class="fld"><label for="c-feed">Feed</label><input id="c-feed" type="number" value="4.0" step="0.1"><span class="lbl">ipm</span></div>
+        <div class="fld"><label for="c-plunge">Plunge</label><input id="c-plunge" type="number" value="1.0" step="0.1"><span class="lbl">ipm</span></div>
         <div class="fld"><label for="c-pass">Passes</label><input id="c-pass" type="number" value="3" step="1" min="1" max="12"></div>
         <div class="fld"><label for="c-clear">Clear X</label><input id="c-clear" type="number" value="0.85" step="0.01"></div>
+        <div class="fld"><label for="c-gap">Rapid gap</label><input id="c-gap" type="number" value="0.010" step="0.001" min="0.002"><span class="lbl">in above the OD, radial</span></div>
       </div>
       <div class="btns">
         <button type="button" class="btn" id="b-nc">Export macro .nc</button>
         <button type="button" class="btn plain" id="b-nc2">Line-by-line reference .nc</button>
+        <button type="button" class="btn plain" id="b-lay" title="A layout for the program builder: load it into a side that already has ops and pick INDEX_BARREL from the op library">For the program builder .json</button>
       </div>
       <div class="msg" id="nc-msg">303 SS defaults from the builder's own table: 3973 RPM, 2.0 IPM on a 1/8 ball. Speeds are per ball size and material: retune when the ball changes.</div>
     </div>
@@ -1266,7 +1268,7 @@ function render(){
    Everything below reads geom() — the same geometry both views and every check read — so the
    program, the STL and the DXF cannot disagree with what is on screen. */
 
-const CUT={prog:7500,tool:'T0707',dir:1,rpm:3973,feed:2.0,plunge:0.5,passes:3,clearX:0.85,tol:0.0002};
+const CUT={prog:7500,tool:'T0707',dir:1,rpm:3973,feed:4.0,plunge:1.0,passes:3,clearX:0.85,gap:0.010,tol:0.0002};
 const clean=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9 .\-_/]/g,'').trim();
 const fileBase=()=>clean($('#rev').value).replace(/[ /]+/g,'_')||'INDEX_BARREL';
 
@@ -1292,76 +1294,126 @@ function progModel(){
   const back=[{x:g.bot[0].x,z:g.L,d:S.rows.bot.d},{x:g.bot[0].x,z:g.bot[0].z,d:S.rows.bot.d},...g.B];
   const runs=[['TOP SLOT + A - DOWN STROKE',dpSimplify(front,CUT.tol)],['BOTTOM SLOT + B - UP STROKE',dpSimplify(back,CUT.tol)]];
   let maxStep=0; for(const [,pts] of runs) for(const p of pts) maxStep=Math.max(maxStep,D-p.d);
-  const deg=x=>x/R*180/Math.PI;
-  const ratio=(a,b)=>{const dC=deg(b.x-a.x),dZ=b.z-a.z,dX=2*(a.d-b.d);
-    const tru=Math.sqrt((dX/2)**2+dZ**2+(((b.x-a.x)/R)*(R-b.d+r))**2), comp=Math.sqrt(dX**2+dZ**2+dC**2);
-    return tru>1e-9?comp/tru:1;};
-  return {g,R,r,D,runs,maxStep,deg,ratio,pitch:360/S.N};
+  return {g,R,r,D,runs,maxStep,pitch:360/S.N};
 }
-function progHeader(m,title){
-  const bore=S.D-2*(m.D+WALL);
-  return ['%',`O${String(Math.max(1,Math.round(CUT.prog))).padStart(4,'0')}(INDEX BARREL - ${title})`,
-    `(REV ${clean($('#rev').value)||'-'} - FROM INDEX BARREL DESIGNER)`,
-    `(${S.N} INDEXES  OD ${S.D.toFixed(4)}  LG ${m.g.L.toFixed(4)}  BORE ${bore>0?bore.toFixed(4):'NONE'})`,
-    `(BALL ${S.ball.toFixed(4)}  DEPTH ${m.D.toFixed(4)}  MAX STEP ${m.maxStep.toFixed(4)})`,
-    '(Z0 = FRONT FACE.  BOTTOM SLOTS RUN OUT AT THE BACK FACE INTO THE CUTOFF KERF)',
-    '(X = BALL TIP DIAMETER.  SET TOOL LENGTH TO THE BALL TIP ON CENTRELINE)'];
+/* ── the design as DATA for the builder's INDEX_BARREL op ──
+   One line, checksummed: IB1~REV~N~OD~BALL~DEPTH~LENGTH~BORE~<top slot + A>~<bottom slot + B>~FNV-1a.
+   Each run is the simplified ball-tip path the program cuts, x (arc inches at the OD), z, depth, to 1e-6.
+   The op places and emits this; it never re-derives the geometry, so what it cuts is what was designed
+   here. A pasted copy that lost a character fails the checksum and emits an alarm, not a toolpath. */
+function designCode(){
+  const m=progModel(), f6=x=>String(Math.round(x*1e6)/1e6);
+  const run=pts=>pts.map(q=>[q.x,q.z,q.d].map(f6).join(',')).join(';');
+  const F=['IB1',clean($('#rev').value)||'-',String(S.N),f6(S.D),f6(S.ball),f6(m.D),f6(m.g.L),f6(S.D-2*(m.D+WALL)),run(m.runs[0][1]),run(m.runs[1][1])];
+  const body=F.join('~'); let h=0x811c9dc5;
+  for(let i=0;i<body.length;i++){h^=body.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+  return body+'~'+h.toString(16);
 }
-function macroProgram(){
-  const m=progModel(), n=S.N, o=progHeader(m,'MACRO');
-  o.push('','(--- SETTINGS - EDIT THESE AT THE CONTROL ---)',
-    `#140=${CUT.dir<0?'-1.':'1.'}(C DIRECTION: 1 = AS MODELLED, -1 = MIRROR IMAGE)`,
-    `#141=${Math.round(CUT.rpm)}(LIVE RPM)`,
-    `#142=${CUT.feed.toFixed(1)}(FEED IPM AT THE BALL)`,
-    `#143=${CUT.plunge.toFixed(1)}(RADIAL PLUNGE FEED IPM)`,
-    `#131=${Math.round(CUT.passes)}(DEPTH PASSES - LAST ONE IS THE FINISH)`,
-    `#132=${m.D.toFixed(4)}(FULL GROOVE DEPTH)`,
-    '','(--- REFUSALS - A BAD NUMBER MUST STOP, NOT CUT ---)',
-    `IF[#132GT${m.D.toFixed(4)}]THEN#3000=1(DEPTH OVER DESIGN - WALL UNDER .100)`,
-    'IF[#131LT1]THEN#3000=2(NEED AT LEAST ONE PASS)',
-    'IF[#131GT12]THEN#3000=3(TOO MANY PASSES)',
-    'IF[ABS[#140]NE1.]THEN#3000=4(#140 MUST BE 1 OR -1)',
-    '','M5','M50(C AXIS ORIENTATION ON)','G0C0.','M83(C UNCLAMPED - C MOVES WHILE CUTTING)',
-    `${CUT.tool}V0(BALL END MILL ${S.ball.toFixed(4)})`,'G97S#141M23',
-    `G0G40G98X${CUT.clearX.toFixed(4)}V0Z-0.1000(G98 - EVERY F BELOW IS IPM)`,
-    '','(--- DO1 PASSES / DO2 STATIONS ---)','#144=1(PASS)','WHILE[#144LE#131]DO1',
-    '#149=[#132*#144/#131](DEPTH THIS PASS)',
-    `IF[#149GT[#132-${m.maxStep.toFixed(4)}]]THEN#149=[#132-${m.maxStep.toFixed(4)}](A ROUGH PASS NEVER CUTS BELOW A STEP FLOOR)`,
-    'IF[#144EQ#131]THEN#149=#132(FINISH AT FULL DEPTH)',
-    `#147=[${S.D.toFixed(4)}-2*#149](X AT THIS DEPTH)`,
-    '#148=0(ROUGH - IGNORE THE STEPS)','IF[#144EQ#131]THEN#148=1(FINISH - CUT THE STEPS)',
-    '#145=1(STATION)',`WHILE[#145LE${n}]DO2`,`#146=[[#145-1]*${m.pitch.toFixed(4)}](STATION C OFFSET)`);
-  const X=d=>{const t=2*(m.D-d);return t>5e-5?`X[#147+#148*${t.toFixed(4)}]`:'X#147';};
-  for(const [name,pts] of m.runs){
-    const p0=pts[0];
-    o.push(`(${name})`,`G0X${CUT.clearX.toFixed(4)}Z${p0.z.toFixed(4)}C[#140*[#146+${m.deg(p0.x).toFixed(3)}]]`,`G1${X(p0.d)}F#143`);
-    for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];
-      o.push(`G1${X(b.d)}Z${b.z.toFixed(4)}C[#140*[#146+${m.deg(b.x).toFixed(3)}]]F[#142*${m.ratio(a,b).toFixed(3)}]`);}
-    o.push(`G0X${CUT.clearX.toFixed(4)}`);
-  }
-  o.push('#145=[#145+1]','END2','#144=[#144+1]','END1','','G0X2.0','T0M25','M83','G4U1.0','M51(C AXIS ORIENTATION OFF)','M30','%');
-  return o.join('\n')+'\n';
-}
-function linesProgram(){
-  const m=progModel(), n=Math.max(1,Math.round(CUT.passes)), floor=m.D-m.maxStep;
-  const caps=Array.from({length:n},(_,i)=>i===n-1?m.D:Math.min(m.D*(i+1)/n,floor));
-  const o=progHeader(m,'LINE BY LINE REFERENCE - DO NOT LOAD');
-  o.push(`#140=${CUT.dir<0?'-1.':'1.'}`,'M5','M50','G0C0.','M83',`${CUT.tool}V0`,`G97S${Math.round(CUT.rpm)}M23`,`G0G40G98X${CUT.clearX.toFixed(4)}V0Z-0.1000`);
-  caps.forEach((cap,pi)=>{
-    const fin=pi===n-1, X=d=>(S.D-2*(fin?d:cap)).toFixed(4);
-    o.push(`(PASS ${pi+1} OF ${n} - DEPTH ${cap.toFixed(4)})`);
-    for(let st=0;st<S.N;st++){const off=m.pitch*st;
-      for(const [name,pts] of m.runs){
-        const p0=pts[0];
-        o.push(`(STN ${st+1} ${name})`,`G0X${CUT.clearX.toFixed(4)}Z${p0.z.toFixed(4)}C[#140*${(off+m.deg(p0.x)).toFixed(3)}]`,`G1X${X(p0.d)}F${CUT.plunge.toFixed(1)}`);
-        for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];
-          o.push(`G1X${X(b.d)}Z${b.z.toFixed(4)}C[#140*${(off+m.deg(b.x)).toFixed(3)}]F${(CUT.feed*m.ratio(a,b)).toFixed(3)}`);}
-        o.push(`G0X${CUT.clearX.toFixed(4)}`);
+/* ── the programs: the builder's INDEX_BARREL op, run here ──
+   The macro and its line-by-line reference are written by the SAME function the program builder runs for
+   its INDEX_BARREL op, copied in from shared/ops.js by unminified-workflow/build.js. The designer hands it
+   the design as data (designCode) plus the cut settings, with `standalone` set so it adds the program's
+   own start and end. Do not edit between the markers: build.js overwrites it. */
+/* ── BEGIN INDEX_BARREL generator, copied from shared/ops.js by unminified-workflow/build.js ── */
+const INDEX_BARREL_GEN=v=>{
+      const bad=why=>[`(INDEX BARREL - DESIGN DATA ${why})`,`#3000=9(INDEX BARREL DESIGN DATA ${why})`];
+      const F=String(v.design||"").trim().split("~");
+      if(F.length!==11||F[0]!=="IB1")return bad("MISSING - EXPORT IT FROM THE DESIGNER");
+      const body=F.slice(0,10).join("~");let h=0x811c9dc5;
+      for(let i=0;i<body.length;i++){h^=body.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+      if(h.toString(16)!==F[10])return bad("DAMAGED - EXPORT IT AGAIN");
+      const num=s=>{const x=Number(s);if(s===""||!isFinite(x))throw new Error("bad number");return x;};
+      let N,Dia,ball,D,L,bore,runs;
+      try{
+        N=Math.round(num(F[2]));Dia=num(F[3]);ball=num(F[4]);D=num(F[5]);L=num(F[6]);bore=num(F[7]);
+        runs=[["TOP SLOT + A - DOWN STROKE",F[8]],["BOTTOM SLOT + B - UP STROKE",F[9]]].map(([nm,s])=>[nm,s.split(";").map(p=>{
+          const q=p.split(",").map(num);if(q.length!==3)throw new Error("bad point");return {x:q[0],z:q[1],d:q[2]};})]);
+      }catch(e){return bad("DAMAGED - EXPORT IT AGAIN");}
+      if(!(N>=2&&Dia>0&&ball>0&&D>0&&L>0)||runs.some(([,p])=>p.length<2))return bad("DAMAGED - EXPORT IT AGAIN");
+      const rev=F[1].replace(/[^A-Z0-9 .\-_/]/g,"")||"-";
+      const R=Dia/2,r=ball/2,pitch=360/N,f4=x=>x.toFixed(4),zo=parseFloat(v.zOff)||0,Z=z=>f4(z+zo);
+      let maxStep=0;for(const [,p] of runs)for(const q of p)maxStep=Math.max(maxStep,D-q.d);
+      const deg=x=>x/R*180/Math.PI;
+      // G98 with a rotary axis: the control reads F against the composite of X (diameter), Z and C in
+      // degrees. Scale each block so the ball itself moves at the programmed IPM.
+      const ratio=(a,b)=>{const dC=deg(b.x-a.x),dZ=b.z-a.z,dX=2*(a.d-b.d);
+        const tru=Math.sqrt((dX/2)**2+dZ**2+(((b.x-a.x)/R)*(R-b.d+r))**2),comp=Math.sqrt(dX**2+dZ**2+dC**2);
+        return tru>1e-9?comp/tru:1;};
+      const pf=parseFloat(v.passes),passes=isFinite(pf)?Math.round(pf):3;
+      const tool=String(v.toolNum||"T0707").replace(/[()\[\]]/g,"").trim(),rpm=Math.round(parseFloat(v.liveRPM)||3973);
+      const feed=parseFloat(v.feed)||4,plunge=parseFloat(v.plunge)||1,clearX=parseFloat(v.clearX)||0.85;
+      const gp=parseFloat(v.gap),gap=isFinite(gp)?gp:0.010,rapidX=Dia+2*gap,dir=String(v.cDir)==="-1"?-1:1;
+      const stand=!!v.standalone,lines=v.emitMode==="Line by line (reference)";
+      const o=stand?["%",`O${String(Math.max(1,Math.round(parseFloat(v.progNum)||7500))).padStart(4,"0")}(INDEX BARREL - ${lines?"LINE BY LINE REFERENCE - DO NOT LOAD":"MACRO"})`]:[];
+      o.push(`(REV ${rev} - FROM INDEX BARREL DESIGNER)`,
+        `(${N} INDEXES  OD ${f4(Dia)}  LG ${f4(L)}  BORE ${bore>0?f4(bore):"NONE"})`,
+        `(BALL ${f4(ball)}  DEPTH ${f4(D)}  MAX STEP ${f4(maxStep)})`,
+        zo===0?"(Z0 = FRONT FACE.  BOTTOM SLOTS RUN OUT AT THE BACK FACE INTO THE CUTOFF KERF)"
+              :`(BARREL FRONT FACE AT Z${f4(zo)}.  BOTTOM SLOTS RUN OUT AT ITS BACK FACE Z${f4(zo+L)})`,
+        "(X = BALL TIP DIAMETER.  SET TOOL LENGTH TO THE BALL TIP ON CENTRELINE)");
+      if(lines){
+        const n=Math.max(1,passes),floor=D-maxStep;
+        const caps=Array.from({length:n},(_,i)=>i===n-1?D:Math.min(D*(i+1)/n,floor));
+        o.push(`#140=${dir<0?"-1.":"1."}`,...(stand?["M5","M50"]:[]),"G0C0.","M83",`${tool}V0`,`G97S${rpm}M23`,`G0G40G98X${f4(clearX)}V0Z${Z(-0.1)}`);
+        caps.forEach((cap,pi)=>{
+          const fin=pi===n-1,X=d=>f4(Dia-2*(fin?d:cap));
+          o.push(`(PASS ${pi+1} OF ${n} - DEPTH ${f4(cap)})`);
+          for(let st=0;st<N;st++){const off=pitch*st;
+            for(const [name,pts] of runs){const p0=pts[0];
+              o.push(`(STN ${st+1} ${name})`,`G0X${f4(clearX)}Z${Z(p0.z)}C[#140*${(off+deg(p0.x)).toFixed(3)}]`,`G0X${f4(rapidX)}`,`G1X${X(p0.d)}F${plunge.toFixed(1)}`);
+              for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];
+                o.push(`G1X${X(b.d)}Z${Z(b.z)}C[#140*${(off+deg(b.x)).toFixed(3)}]F${(feed*ratio(a,b)).toFixed(3)}`);}
+              o.push(`G0X${f4(clearX)}`);}}
+        });
+        o.push("G0X2.0","T0M25","M83",...(stand?["M51","M30","%"]:[]));
+        return o;
       }
-    }
-  });
-  o.push('G0X2.0','T0M25','M83','M51','M30','%');
-  return o.join('\n')+'\n';
+      const Xm=d=>{const t=2*(D-d);return t>5e-5?`X[#147+#148*${t.toFixed(4)}]`:"X#147";};
+      o.push("","(--- SETTINGS - EDIT THESE AT THE CONTROL ---)",
+        `#140=${dir<0?"-1.":"1."}(C DIRECTION: 1 = AS MODELLED, -1 = MIRROR IMAGE)`,
+        `#141=${rpm}(LIVE RPM)`,
+        `#142=${feed.toFixed(1)}(FEED IPM AT THE BALL)`,
+        `#143=${plunge.toFixed(1)}(RADIAL PLUNGE FEED IPM)`,
+        `#135=${passes}(DEPTH PASSES - LAST ONE IS THE FINISH)`,
+        `#136=${f4(D)}(FULL GROOVE DEPTH)`,
+        `#137=${f4(rapidX)}(RAPID-TO X - ${gap.toFixed(3)} ABOVE THE OD)`,
+        "","(--- REFUSALS - A BAD NUMBER MUST STOP, NOT CUT ---)",
+        `IF[#136GT${f4(D)}]THEN#3000=1(DEPTH OVER DESIGN - WALL UNDER .100)`,
+        "IF[#135LT1]THEN#3000=2(NEED AT LEAST ONE PASS)",
+        "IF[#135GT12]THEN#3000=3(TOO MANY PASSES)",
+        "IF[ABS[#140]NE1.]THEN#3000=4(#140 MUST BE 1 OR -1)",
+        `IF[#137LT${f4(Dia+0.004)}]THEN#3000=5(RAPID X TOO CLOSE TO THE OD)`,
+        "",...(stand?["M5","M50(C AXIS ORIENTATION ON)"]:[]),"G0C0.","M83(C UNCLAMPED - C MOVES WHILE CUTTING)",
+        `${tool}V0(BALL END MILL ${f4(ball)})`,"G97S#141M23",
+        `G0G40G98X${f4(clearX)}V0Z${Z(-0.1)}(G98 - EVERY F BELOW IS IPM)`,
+        "","(--- DO1 PASSES / DO2 STATIONS ---)","#144=1(PASS)","WHILE[#144LE#135]DO1",
+        "#149=[#136*#144/#135](DEPTH THIS PASS)",
+        `IF[#149GT[#136-${f4(maxStep)}]]THEN#149=[#136-${f4(maxStep)}](A ROUGH PASS NEVER CUTS BELOW A STEP FLOOR)`,
+        "IF[#144EQ#135]THEN#149=#136(FINISH AT FULL DEPTH)",
+        `#147=[${f4(Dia)}-2*#149](X AT THIS DEPTH)`,
+        "#148=0(ROUGH - IGNORE THE STEPS)","IF[#144EQ#135]THEN#148=1(FINISH - CUT THE STEPS)",
+        "#145=1(STATION)",`WHILE[#145LE${N}]DO2`,`#146=[[#145-1]*${pitch.toFixed(4)}](STATION C OFFSET)`);
+      for(const [name,pts] of runs){const p0=pts[0];
+        o.push(`(${name})`,`G0X${f4(clearX)}Z${Z(p0.z)}C[#140*[#146+${deg(p0.x).toFixed(3)}]]`,"G0X#137",`G1${Xm(p0.d)}F#143`);
+        for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];
+          o.push(`G1${Xm(b.d)}Z${Z(b.z)}C[#140*[#146+${deg(b.x).toFixed(3)}]]F[#142*${ratio(a,b).toFixed(3)}]`);}
+        o.push(`G0X${f4(clearX)}`);}
+      o.push("#145=[#145+1]","END2","#144=[#144+1]","END1","","G0X2.0","T0M25","M83",...(stand?["G4U1.0","M51(C AXIS ORIENTATION OFF)","M30","%"]:[]));
+      return stand?o:o.filter(l=>l!=="");
+    };
+/* ── END INDEX_BARREL generator ── */
+function opValues(){
+  return {design:designCode(),zOff:0,toolNum:CUT.tool,liveRPM:CUT.rpm,feed:CUT.feed,plunge:CUT.plunge,passes:CUT.passes,
+          clearX:CUT.clearX,gap:CUT.gap,cDir:CUT.dir<0?'-1':'1',emitMode:'Macro loop'};
+}
+function macroProgram(){ return INDEX_BARREL_GEN({...opValues(),standalone:true,progNum:CUT.prog}).join('\n')+'\n'; }
+function linesProgram(){ return INDEX_BARREL_GEN({...opValues(),emitMode:'Line by line (reference)',standalone:true,progNum:CUT.prog}).join('\n')+'\n'; }
+/* a layout the program builder loads: into an empty side it IS the program; into a side that already has
+   ops it opens the op library, and the INDEX_BARREL op is picked from there into the running layout */
+function builderLayout(){
+  const id='op_'+Date.now(), rev=clean($('#rev').value)||'INDEX BARREL';
+  return JSON.stringify({layoutName:`${rev} INDEX BARREL`,savedAt:new Date().toISOString(),
+    operations:[{id,type:'INDEX_BARREL',label:'Index Barrel Grooves (from the Designer)'}],opValues:{[id]:opValues()},opHoles:{}},null,1);
 }
 
 /* ── stroke font for the recessed revision: glyphs on a 4 wide × 6 tall grid ── */
@@ -1501,19 +1553,19 @@ function loadDesign(txt){
   // v1-v5 saves: A always shallow at the bottom; B's only step was the optional top step
   if(j.shape.A.on===undefined) Object.assign(T.A,{on:true,dir:'bot'});
   if(j.shape.B.on===undefined){ const t=j.top||{}; Object.assign(T.B,{on:!!t.on,dir:'top',rz:null,rl:t.rl??0.08,step:t.step??0.010}); }
-  Object.assign(CUT,j.cut||{});
+  Object.assign(CUT,{gap:0.010},j.cut||{});   // saves before the rapid gap existed plunged from Clear X; they get the .010 default
   $('#rev').value=j.rev||''; $('#n-idx').value=String(S.N); $('#dia').value=S.D.toFixed(3); $('#pin').value=S.pinMin.toFixed(3);
   document.querySelectorAll('[data-z]').forEach(o=>o.setAttribute('aria-pressed',String(o.dataset.z===S.zMode)));
   cutToForm(); update();
 }
 function cutToForm(){
   $('#c-prog').value=CUT.prog; $('#c-tool').value=CUT.tool; $('#c-dir').value=String(CUT.dir); $('#c-rpm').value=CUT.rpm;
-  $('#c-feed').value=CUT.feed; $('#c-plunge').value=CUT.plunge; $('#c-pass').value=CUT.passes; $('#c-clear').value=CUT.clearX;
+  $('#c-feed').value=CUT.feed; $('#c-plunge').value=CUT.plunge; $('#c-pass').value=CUT.passes; $('#c-clear').value=CUT.clearX; $('#c-gap').value=CUT.gap.toFixed(3);
 }
 function formToCut(){
   const n=(id,d)=>{const v=parseFloat($(id).value);return isFinite(v)?v:d;};
   CUT.prog=n('#c-prog',7500); CUT.tool=$('#c-tool').value; CUT.dir=+$('#c-dir').value; CUT.rpm=n('#c-rpm',3973);
-  CUT.feed=n('#c-feed',2); CUT.plunge=n('#c-plunge',0.5); CUT.passes=Math.max(1,Math.min(12,Math.round(n('#c-pass',3)))); CUT.clearX=n('#c-clear',0.85);
+  CUT.feed=n('#c-feed',2); CUT.plunge=n('#c-plunge',0.5); CUT.passes=Math.max(1,Math.min(12,Math.round(n('#c-pass',3)))); CUT.clearX=n('#c-clear',0.85); CUT.gap=Math.max(0.002,n('#c-gap',0.010));
 }
 function saveFile(name,data,type){
   const blob=data instanceof Blob?data:new Blob([data],{type:type||'application/octet-stream'});
@@ -1717,7 +1769,7 @@ update();
 
 /* ── app wiring ── */
 cutToForm();
-document.querySelectorAll('#c-prog,#c-tool,#c-dir,#c-rpm,#c-feed,#c-plunge,#c-pass,#c-clear').forEach(el=>el.addEventListener('change',formToCut));
+document.querySelectorAll('#c-prog,#c-tool,#c-dir,#c-rpm,#c-feed,#c-plunge,#c-pass,#c-clear,#c-gap').forEach(el=>el.addEventListener('change',formToCut));
 $('#b-save').addEventListener('click',()=>{saveFile(fileBase()+'.json',designJSON(),'application/json');say('#exp-msg',`Saved ${fileBase()}.json`,'ok');});
 $('#b-open').addEventListener('click',()=>$('#f-open').click());
 $('#f-open').addEventListener('change',e=>{const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
@@ -1737,9 +1789,10 @@ $('#b-stl').addEventListener('click',()=>{
   },20);
 });
 $('#b-nc').addEventListener('click',()=>{formToCut();const n=`${fileBase()}_O${CUT.prog}.nc`;saveFile(n,macroProgram(),'text/plain');say('#nc-msg',`Saved ${n}. Prove in air first: C direction, feed timing, X+Z+C together.`,'ok');});
+$('#b-lay').addEventListener('click',()=>{formToCut();const n=`${fileBase()}_INDEX_BARREL_LAYOUT.json`;saveFile(n,builderLayout(),'application/json');say('#nc-msg',`Saved ${n}. In the program builder, LOAD it into the side that has your part program and pick Index Barrel Grooves from the op library. Set its Barrel front face Z if the barrel does not start at Z0.`,'ok');});
 $('#b-nc2').addEventListener('click',()=>{formToCut();const n=`${fileBase()}_O${CUT.prog}_LINES.nc`;saveFile(n,linesProgram(),'text/plain');say('#nc-msg',`Saved ${n}. Reference only: the macro is checked against it.`,'ok');});
 /* a small API for the headless check (apptest.js) */
-window.IBD={S,T,CUT,geom,update,checks,setRamp,macroProgram,linesProgram,buildSTL,designJSON,loadDesign,formToCut,cutToForm};
+window.IBD={S,T,CUT,geom,update,checks,setRamp,macroProgram,linesProgram,buildSTL,designJSON,loadDesign,formToCut,cutToForm,designCode,opValues,builderLayout};
 })();
 </script>
 <script>
@@ -1767,7 +1820,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (5e56de353b1e) */
+<script>/* installable build (cc5d67486102) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>

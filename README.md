@@ -6,4 +6,4 @@ part one station and it cannot drive backwards), and exports the lathe macro pro
 **Install on Android:** open the site in Chrome → menu → *Install app*. It then works with no internet.
 
 This repository is a build product. Do not edit it by hand; it is regenerated from the designer.
-Build 5e56de353b1e.
+Build cc5d67486102.
