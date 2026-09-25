@@ -243,18 +243,50 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
 .msg{font-family:var(--sans);font-size:12px;color:var(--muted);line-height:1.5;}
 .msg.bad{color:var(--bad);} .msg.ok{color:var(--ok);}
 @media (max-width:820px){ .app-grid{grid-template-columns:1fr;} }
+/* ── TABLET LAYOUT: one section per tab; the PATH tab never scrolls, so a drag cannot move the page ── */
+#tabs{display:none;}
+body.tabs #tabs{display:flex;position:sticky;top:0;z-index:5;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line2);overflow-x:auto;}
+#tabs button{flex:1 0 auto;min-height:46px;padding:0 14px;font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.08em;background:transparent;color:var(--muted);border:1px solid transparent;border-radius:6px;cursor:pointer;}
+#tabs button[aria-selected="true"]{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-line);}
+#tabs .lay{flex:0 0 auto;color:var(--dim);font-weight:400;}
+body.tabs{margin:0;}
+body.tabs .wrap{max-width:none;padding:8px 10px 14px;gap:8px;}
+body.tabs header,body.tabs .intro,body.tabs .tile-head{display:none;}
+body.tabs [data-tab]:not(.tab-on){display:none !important;}
+body.tabs .tile{padding:8px;gap:8px;}
+body.tabs .views{display:block;}
+body.tabs.cur-path{overflow:hidden;height:100dvh;overscroll-behavior:none;}
+html:has(body.tabs.cur-path){overflow:hidden;overscroll-behavior:none;}
+body.tabs.cur-path #unrolled{height:max(240px,calc(100dvh - 250px));touch-action:none;}
+body.tabs.cur-path .readout{display:flex;overflow-x:auto;gap:6px;padding-bottom:2px;}
+body.tabs.cur-path .readout .ro{flex:0 0 auto;min-width:150px;}
+body.tabs #wrap{touch-action:pan-y;}
+body.tabs .sl input[type=range]{min-height:34px;}
+body.tabs .seg button{min-height:36px;}
+@media (min-width:900px){ body.tabs .shapes{grid-template-columns:1fr 1fr;} }
 </style>
 </head><body>
+<nav id="tabs" role="tablist" aria-label="Designer sections">
+  <button type="button" role="tab" data-go="path">PATH</button>
+  <button type="button" role="tab" data-go="shape">SHAPE</button>
+  <button type="button" role="tab" data-go="3d">3D</button>
+  <button type="button" role="tab" data-go="checks">CHECKS</button>
+  <button type="button" role="tab" data-go="table">TABLE</button>
+  <button type="button" role="tab" data-go="setup">SETUP</button>
+  <button type="button" role="tab" data-go="export">EXPORT</button>
+  <button type="button" class="lay" data-layout="page" title="Show everything on one scrolling page">PAGE</button>
+</nav>
 
 <div class="wrap">
 
 <header>
   <div class="eyebrow">Hanwha SL20H · offline designer · no internet needed</div>
   <h1>Index Barrel Designer</h1>
+  <div><button type="button" class="btn plain" data-layout="tabs">Tablet layout</button></div>
   <p class="lede">Design a one-way indexing barrel cam: set the index count, diameter, length and pin size, shape one index's grooves, then save the design, a 3D-printable STL with the revision recessed on the front face, a DXF, and the macro program for the machine.</p>
 </header>
 
-<section class="app-panel" aria-labelledby="exp-h">
+<section class="app-panel" aria-labelledby="exp-h" data-tab="export">
   <div class="app-grid">
     <div class="box">
       <span class="h" id="exp-h">DESIGN &amp; EXPORT</span>
@@ -301,7 +333,7 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
 </section>
 
 <section aria-labelledby="tile-h">
-  <div>
+  <div class="intro">
     <h2 id="tile-h">Index path</h2>
     <p class="lede" style="font-size:14.5px;margin-top:6px">Drag the red rings to move the four junctions and the orange knees to reshape the grooves, or use the sliders. The tiles underneath check ramp angle, lands, the one-way step and the back-feed guards live.</p>
   </div>
@@ -309,7 +341,7 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
   <div class="tile" id="tile">
     <div class="tile-head"><span class="t">INDEX PATH · ONE INDEX</span><span class="s">drawn once, repeated N times around the barrel</span></div>
 
-    <div class="bar">
+    <div class="bar" data-tab="setup">
       <div class="fld"><label for="n-idx">Indexes</label>
         <select id="n-idx"><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select></div>
       <div class="fld"><label for="dia">Dia</label><input id="dia" type="number" value="0.750" step="0.005" min="0.2" max="1.0"><span class="lbl">in</span></div>
@@ -331,7 +363,7 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
     </div>
 
     <div class="views">
-      <div class="view">
+      <div class="view" data-tab="path">
         <div class="view-h"><span>Unrolled · the DXF frame</span><b id="u-cap"></b></div>
         <svg id="unrolled" role="img" aria-label="Unrolled groove path for one index with the neighbouring indexes shown faintly"></svg>
         <div class="view-f legend">
@@ -341,14 +373,14 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
           <span><i class="sw" style="background:var(--ok)"></i>B shallower than full</span>
         </div>
       </div>
-      <div class="view">
+      <div class="view" data-tab="3d">
         <div class="view-h"><span>Wrapped · revolved on the barrel</span><b id="w-cap"></b></div>
         <div id="wrapbox"><canvas id="wrap" aria-label="Barrel with the groove path repeated around it"></canvas></div>
         <div class="view-f"><label for="rot" class="lbl">Rotate</label><input id="rot" type="range" min="0" max="360" value="20"><span id="rot-v" class="mono">20°</span></div>
       </div>
     </div>
 
-    <div class="shapes">
+    <div class="shapes" data-tab="shape">
       <div class="shape" id="shape-A">
         <div class="sh-head"><span class="t">A · DOWN STROKE</span>
           <div class="seg" role="group" aria-label="A editing mode"><button type="button" id="A-m-s" data-tr="A" data-mode="SLIDERS" aria-pressed="true">SLIDERS</button><button type="button" id="A-m-p" data-tr="A" data-mode="POINTS" aria-pressed="false">POINTS</button></div>
@@ -383,16 +415,16 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
       </div>
     </div>
 
-    <div class="readout" id="readout"></div>
+    <div class="readout" id="readout" data-tab="path checks"></div>
 
-    <div class="tablebox"><table id="chart">
+    <div class="tablebox" data-tab="table"><table id="chart">
       <thead><tr><th>ROW</th><th>TRACK</th><th>U % OF INDEX</th><th>C°</th><th>ARC in</th><th>Z in</th><th>DEPTH in</th><th>SHAPE</th><th></th></tr></thead>
       <tbody></tbody>
     </table></div>
 
-    <details><summary>DXF for this index (what Copy DXF puts on the clipboard)</summary><pre id="dxf"></pre></details>
+    <details data-tab="table"><summary>DXF for this index (what Copy DXF puts on the clipboard)</summary><pre id="dxf"></pre></details>
 
-    <p class="tile-foot">Each groove is a straight entry run, a bend of the set radius, and a straight exit run between its two fixed ends. With the two angles set, the knee's position follows, so the ends cannot drift. Knee Z slides the knee along the entry run and swings the exit run to still meet the end. Node spacing divides the result into chart rows, and the status line gives the chord error it costs on the bend. U is the fraction of one index, so the path stretches to fit when the index count changes. C° and ARC are derived from U, the index count and the diameter. Linked rows are fixed by the neighbouring index: B always ends on the next index's top slot, which is what makes N copies close around the barrel. In the real op, the wrapped view will be drawn by executing the generated program, so it cannot disagree with the G-code. Here it is drawn from the chart.</p>
+    <p class="tile-foot" data-tab="table">Each groove is a straight entry run, a bend of the set radius, and a straight exit run between its two fixed ends. With the two angles set, the knee's position follows, so the ends cannot drift. Knee Z slides the knee along the entry run and swings the exit run to still meet the end. Node spacing divides the result into chart rows, and the status line gives the chord error it costs on the bend. U is the fraction of one index, so the path stretches to fit when the index count changes. C° and ARC are derived from U, the index count and the diameter. Linked rows are fixed by the neighbouring index: B always ends on the next index's top slot, which is what makes N copies close around the barrel. In the real op, the wrapped view will be drawn by executing the generated program, so it cannot disagree with the G-code. Here it is drawn from the chart.</p>
   </div>
 </section>
 
@@ -401,6 +433,7 @@ input[type=text]{font-family:var(--mono);font-size:12px;background:var(--card);c
 <script>
 (()=>{
 const REF={N:6,D:0.75};
+const HIT=matchMedia('(pointer:coarse)').matches?1.8:1;   // a fingertip needs a bigger target than a mouse
 const DES={
   top:{u:0,z:0.1875,d:0.0625},
   A:[[0.0309,0.4463,0.0625,'SMOOTH'],[0.0487,0.5175,0.0625,'SMOOTH'],[0.0729,0.5700,0.0625,'SMOOTH'],[0.1175,0.6225,0.0625,'SMOOTH'],[0.1881,0.6788,0.0625,'SMOOTH'],[0.2101,0.6938,0.0625,'SMOOTH'],[0.3329,0.7763,0.0477,'SMOOTH'],[0.3750,0.8058,0.0475,'LINE']].map(([u,z,d,shape])=>({u,z,d,shape})),
@@ -743,7 +776,7 @@ function drawUnrolled(g){
   S.rows.B.forEach((n,i)=>{ if(every('B',S.rows.B.length,i)) lab(g.Bn[i+1],'B'+(i+1)); else s+=`<circle class="u-node" cx="${g.Bn[i+1].x}" cy="${g.Bn[i+1].z}" r="${S.ball*0.07}"/>`; });
   lab(g.An[0],'',true); lab(g.bot[0],'S',true); lab(g.Bn[g.Bn.length-1],'',true);
   // v4: the four junction points you can drag
-  const hd=(x,z,h,title)=>{s+=`<circle class="u-drag" data-h="${h}" cx="${x}" cy="${z}" r="${S.ball*0.2}"><title>${title}</title></circle>`;};
+  const hd=(x,z,h,title)=>{s+=`<circle class="u-drag" data-h="${h}" cx="${x}" cy="${z}" r="${S.ball*0.2*HIT}"><title>${title}</title></circle>`;};
   hd(g.top[1].x,g.top[1].z,'top','Top junction: drag to move the top slot end and the A/B split');
   hd(g.Bn[g.Bn.length-1].x,g.Bn[g.Bn.length-1].z,'topn','The same top junction, one index over');
   hd(g.bot[0].x,g.bot[0].z,'bot','Bottom slot top: drag to move it');
@@ -754,7 +787,7 @@ function drawUnrolled(g){
     const c=P.st;
     s+=`<polyline class="u-con" points="${c.P0.x},${c.P0.z} ${c.K.x},${c.K.z} ${c.P1.x},${c.P1.z}"/>`;
     if(c.Reff>1e-6) for(const q of [c.T1,c.T2]) s+=`<circle class="u-tan" cx="${q.x}" cy="${q.z}" r="${S.ball*0.06}"/>`;
-    s+=`<circle class="u-knee" data-knee="${trn}" cx="${c.K.x}" cy="${c.K.z}" r="${S.ball*0.17}"><title>Drag to move the ${trn} knee</title></circle>`;
+    s+=`<circle class="u-knee" data-knee="${trn}" cx="${c.K.x}" cy="${c.K.z}" r="${S.ball*0.17*HIT}"><title>Drag to move the ${trn} knee</title></circle>`;
     s+=`<text class="u-txt" x="${c.K.x+(trn==='A'?-1:1)*S.ball*0.3}" y="${c.K.z+S.ball*0.05}" font-size="${fs*0.78}" text-anchor="${trn==='A'?'end':'start'}">${trn} R${c.Reff.toFixed(3).replace(/^0/,'')}</text>`;
   }
   // v6: TWO Z RAILS, one per stroke, on the part's own Z. A's sits left of the chart beside its
@@ -817,7 +850,7 @@ function drawUnrolled(g){
     for(let i=0;i<labs.length;i++) labs[i][0]=Math.max(labs[i][0],i?labs[i-1][0]+gap:fs*0.9);
     for(let i=labs.length-1;i>=0;i--) labs[i][0]=Math.min(labs[i][0],i<labs.length-1?labs[i+1][0]-gap:L+pb*0.85);
     for(const [y,t,c] of labs) rt(xl,y,t,c);
-    const rh=(x,y,h,cls,title)=>{s+=`<circle class="u-rh ${cls}${b}" data-h="${h}" cx="${x}" cy="${y}" r="${S.ball*0.17}"><title>${title}</title></circle>`;};
+    const rh=(x,y,h,cls,title)=>{s+=`<circle class="u-rh ${cls}${b}" data-h="${h}" cx="${x}" cy="${y}" r="${S.ball*0.17*HIT}"><title>${title}</title></circle>`;};
     const tD=`${tr} stays deep to here, then the ramp starts. Drag along Z; the ramp end stays put.`, tR=`${tr}'s ramp reaches the step floor here. Drag along Z.`;
     rh(xr,za,tr+'-hi','ns',P.dir==='bot'?tD:tR);
     rh(xr,zb,tr+'-lo','ns',P.dir==='bot'?tR:tD);
@@ -842,6 +875,7 @@ const cv=$('#wrap'), ctx=cv.getContext('2d');
 function tok(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
 function drawWrap(g){
   const box=$('#wrapbox'), dpr=window.devicePixelRatio||1;
+  if(box.clientWidth<40) return;   // hidden (another tab): nothing to draw into, and a zero width makes negative radii
   const W=box.clientWidth, H=Math.round(Math.min(Math.max(W*0.95,260),440));
   cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1419,7 +1453,31 @@ $('#b-nc2').addEventListener('click',()=>{formToCut();const n=`${fileBase()}_O${
 window.IBD={S,T,CUT,geom,update,checks,setRamp,macroProgram,linesProgram,buildSTL,designJSON,loadDesign,formToCut,cutToForm};
 })();
 </script>
-<script>/* installable build (f3f16e928c14) */
+<script>
+/* tablet layout: tabs by default on a touch screen or a narrow window, remembered per device */
+(()=>{
+const TABS=['path','shape','3d','checks','table','setup','export'], b=document.body;
+const store=(k,v)=>{try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v); }catch(e){ return null; }};
+const clearCur=()=>{ for(const c of [...b.classList]) if(c.startsWith('cur-')) b.classList.remove(c); };
+function go(t){
+  if(!TABS.includes(t)) t='path';
+  store('ibd-tab',t); clearCur(); b.classList.add('cur-'+t);
+  document.querySelectorAll('[data-tab]').forEach(e=>e.classList.toggle('tab-on',e.dataset.tab.split(' ').includes(t)));
+  document.querySelectorAll('#tabs [data-go]').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.go===t)));
+  scrollTo(0,0);
+}
+function layout(tabs){
+  b.classList.toggle('tabs',tabs); store('ibd-layout',tabs?'tabs':'page');
+  if(tabs) go(store('ibd-tab')||'path'); else { clearCur(); document.querySelectorAll('.tab-on').forEach(e=>e.classList.remove('tab-on')); }
+}
+document.querySelectorAll('#tabs [data-go]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.go)));
+document.querySelectorAll('[data-layout]').forEach(x=>x.addEventListener('click',()=>layout(x.dataset.layout==='tabs')));
+const saved=store('ibd-layout');
+layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<1100));
+window.IBDTABS={go,layout};
+})();
+</script>
+<script>/* installable build (4aade98fbba4) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
