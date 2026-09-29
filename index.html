@@ -1334,6 +1334,13 @@ const INDEX_BARREL_GEN=v=>{
       const R=Dia/2,r=ball/2,pitch=360/N,f4=x=>x.toFixed(4),zo=parseFloat(v.zOff)||0,Z=z=>f4(z+zo);
       let maxStep=0;for(const [,p] of runs)for(const q of p)maxStep=Math.max(maxStep,D-q.d);
       const deg=x=>x/R*180/Math.PI;
+      // An angle carries ITS OWN sign as the operator: [#146-6.996], never [#146+-6.996]. An operator
+      // followed by a sign alarmed 114 FORMAT ERROR IN MACRO on O5500 (2026-09-29): its top slot starts
+      // before the station line. A leading sign opens a bracket instead ([-6.996*#140]), the form
+      // [-0.2650-#502] already ran in on CAL-007 P2.
+      const a3=x=>{const s=x.toFixed(3);return s==="-0.000"?"0.000":s;};
+      const plusAng=x=>{const s=a3(x);return s[0]==="-"?s:"+"+s;};
+      const cWord=x=>{const s=a3(x);return s[0]==="-"?`C[${s}*#140]`:`C[#140*${s}]`;};
       // G98 with a rotary axis: the control reads F against the composite of X (diameter), Z and C in
       // degrees. Scale each block so the ball itself moves at the programmed IPM.
       const ratio=(a,b)=>{const dC=deg(b.x-a.x),dZ=b.z-a.z,dX=2*(a.d-b.d);
@@ -1360,9 +1367,9 @@ const INDEX_BARREL_GEN=v=>{
           o.push(`(PASS ${pi+1} OF ${n} - DEPTH ${f4(cap)})`);
           for(let st=0;st<N;st++){const off=pitch*st;
             for(const [name,pts] of runs){const p0=pts[0];
-              o.push(`(STN ${st+1} ${name})`,`G0X${f4(clearX)}Z${Z(p0.z)}C[#140*${(off+deg(p0.x)).toFixed(3)}]`,`G0X${f4(rapidX)}`,`G1X${X(p0.d)}F${plunge.toFixed(1)}`);
+              o.push(`(STN ${st+1} ${name})`,`G0X${f4(clearX)}Z${Z(p0.z)}${cWord(off+deg(p0.x))}`,`G0X${f4(rapidX)}`,`G1X${X(p0.d)}F${plunge.toFixed(1)}`);
               for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];
-                o.push(`G1X${X(b.d)}Z${Z(b.z)}C[#140*${(off+deg(b.x)).toFixed(3)}]F${(feed*ratio(a,b)).toFixed(3)}`);}
+                o.push(`G1X${X(b.d)}Z${Z(b.z)}${cWord(off+deg(b.x))}F${(feed*ratio(a,b)).toFixed(3)}`);}
               o.push(`G0X${f4(clearX)}`);}}
         });
         o.push("G0X2.0","T0M25","M83",...(stand?["M51","M30","%"]:[]));
@@ -1394,9 +1401,9 @@ const INDEX_BARREL_GEN=v=>{
         "#148=0(ROUGH - IGNORE THE STEPS)","IF[#144EQ#135]THEN#148=1(FINISH - CUT THE STEPS)",
         "#145=1(STATION)",`WHILE[#145LE${N}]DO2`,`#146=[[#145-1]*${pitch.toFixed(4)}](STATION C OFFSET)`);
       for(const [name,pts] of runs){const p0=pts[0];
-        o.push(`(${name})`,`G0X${f4(clearX)}Z${Z(p0.z)}C[#140*[#146+${deg(p0.x).toFixed(3)}]]`,"G0X#137",`G1${Xm(p0.d)}F#143`);
+        o.push(`(${name})`,`G0X${f4(clearX)}Z${Z(p0.z)}C[#140*[#146${plusAng(deg(p0.x))}]]`,"G0X#137",`G1${Xm(p0.d)}F#143`);
         for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];
-          o.push(`G1${Xm(b.d)}Z${Z(b.z)}C[#140*[#146+${deg(b.x).toFixed(3)}]]F[#142*${ratio(a,b).toFixed(3)}]`);}
+          o.push(`G1${Xm(b.d)}Z${Z(b.z)}C[#140*[#146${plusAng(deg(b.x))}]]F[#142*${ratio(a,b).toFixed(3)}]`);}
         o.push(`G0X${f4(clearX)}`);}
       o.push("#145=[#145+1]","END2","#144=[#144+1]","END1","","G0X2.0","T0M25","M83",...(stand?["G4U1.0","M51(C AXIS ORIENTATION OFF)","M30","%"]:[]));
       return stand?o:o.filter(l=>l!=="");
@@ -1821,7 +1828,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (c77f2b718415) */
+<script>/* installable build (c5f29cbbcfe9) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
