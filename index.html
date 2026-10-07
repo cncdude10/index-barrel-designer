@@ -116,6 +116,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .u-txt.acc{fill:var(--accent);}
 .u-txt.dim{fill:var(--dim);}
 
+.readout[data-wait]{opacity:.55}.readout[data-wait]::before{content:'checks run when you let go';display:block;grid-column:1/-1;font-size:11px;color:var(--muted);margin-bottom:4px}
 .readout{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;}
 @media (max-width:1000px){ .readout{grid-template-columns:repeat(3,minmax(0,1fr));} }
 @media (max-width:700px){ .readout{grid-template-columns:repeat(2,minmax(0,1fr));} }
@@ -966,7 +967,7 @@ function drawWrap2D(g){
    track that cut it and how shallow that ball ran: full depth in the accent, A's ramp shading to
    --warn, B's to --ok. DEPTH ×n exaggerates the groove radially so a .010 step can be seen; the
    ball-tip centre lines ride the same exaggeration. The revision text is only in the STL. */
-const V3={gl:null,mode:'ALL',ex:1,lines:true,yaw:0,pitch:0.35,dist:3,tgt:[0,0,0],fov:30*Math.PI/180,dirty:true,mesh:null,stats:null,raf:0,timer:0,fitNext:true,draft:false,draftRaf:0};
+const V3={gl:null,mode:'ALL',ex:1,lines:true,yaw:0,pitch:0.35,dist:3,tgt:[0,0,0],fov:30*Math.PI/180,dirty:true,mesh:null,stats:null,raf:0,timer:0,fitNext:true,draft:false,draftRaf:0,draftTimer:0,draftAt:0,draftMs:0};
 function v3Col(n){const s=tok(n); let m=s.match(/^#([0-9a-f]{6})$/i); if(m){const v=parseInt(m[1],16);return [(v>>16&255)/255,(v>>8&255)/255,(v&255)/255];}
   m=s.match(/^#([0-9a-f]{3})$/i); if(m) return [...m[1]].map(c=>parseInt(c+c,16)/255);
   m=s.match(/rgba?\(([^)]+)\)/); if(m){const p=m[1].split(/[ ,]+/).map(Number);return [p[0]/255,p[1]/255,p[2]/255];} return [0.6,0.6,0.6];}
@@ -1050,7 +1051,13 @@ function v3Init(){
   $('#wrapbox').closest('.view').classList.add('v3-on');
 }
 function v3Dirty(){ V3.dirty=true; clearTimeout(V3.timer);
-  if(V3.draft){ if(!V3.draftRaf) V3.draftRaf=requestAnimationFrame(()=>{ V3.draftRaf=0; if(V3.draft&&$('#wrapbox').clientWidth>=40) v3Frame(); }); return; }
+  // A draft is spaced out: at most one per 100 ms, or three times as long as the last one took, so the 3D view gets
+  // about a quarter of the time and the view being dragged keeps the rest.
+  if(V3.draft){ if(V3.draftRaf||V3.draftTimer) return;
+    const wait=Math.max(0,V3.draftAt+Math.max(100,3*V3.draftMs)-performance.now());
+    V3.draftTimer=setTimeout(()=>{ V3.draftTimer=0; V3.draftRaf=requestAnimationFrame(()=>{ V3.draftRaf=0;
+      if(!V3.draft||$('#wrapbox').clientWidth<40) return; const t0=performance.now(); v3Frame(); V3.draftAt=performance.now(); V3.draftMs=V3.draftAt-t0; }); },wait);
+    return; }
   V3.timer=setTimeout(()=>{ if($('#wrapbox').clientWidth>=40) v3Frame(); },120); }
 /* a handle drag starts and ends the draft; letting go rebuilds at full detail if a draft is on screen */
 function v3DraftStart(){ V3.draft=true; }
@@ -1267,10 +1274,16 @@ function syncShape(g){
       `${(tr==='A'?S.rows.A.length:S.rows.B.length+1)} segments, bend chord error ${c.chord.toFixed(5)}".`+(P.fitErr!==null?` Fit to the points it was fitted from: within ${f4(P.fitErr)}".`:'');
   }
 }
+// While a handle is held (HELD), the design checks and the DXF text wait: checks() was most of a move's work, and
+// the readout cannot be read mid-drag anyway. The readout stays as it was, marked, and letting go runs them once.
+let HELD=false;
 function render(){
-  G=geom(); const c=checks(G);
-  drawUnrolled(G); drawWrap(G); readout(G,c); derived(G); syncShape(G); syncBar(G);
-  $('#dxf').textContent=dxfText(G);
+  G=geom();
+  drawUnrolled(G); drawWrap(G);
+  if(HELD) $('#readout').dataset.wait='';
+  else { delete $('#readout').dataset.wait; readout(G,checks(G)); }
+  derived(G); syncShape(G); syncBar(G);
+  if(!HELD) $('#dxf').textContent=dxfText(G);
 }
 
 /* ══════════════════════════ APP: EXPORTS ══════════════════════════
@@ -1670,7 +1683,7 @@ usvg.addEventListener('pointerdown',e=>{
   const fl=e.target.closest&&e.target.closest('[data-flip]');
   if(fl){ const tr=fl.dataset.flip, P=T[tr]; setRamp(tr,!P.on?'bot':P.dir==='bot'?'top':'off'); update(); return; }
   if(ds.knee){ kdrag=ds.knee; } else if(ds.h){ hdrag=ds.h; } else return;
-  v3DraftStart(); usvg.setPointerCapture(e.pointerId); e.preventDefault();
+  HELD=true; v3DraftStart(); usvg.setPointerCapture(e.pointerId); e.preventDefault();
 });
 usvg.addEventListener('pointermove',e=>{
   if(!kdrag&&!hdrag) return;
@@ -1708,7 +1721,7 @@ usvg.addEventListener('pointermove',e=>{
   P.a0=Math.min(80,Math.atan2(ex0,ez0)*180/Math.PI); P.a1=Math.min(80,Math.atan2(ex1,ez1)*180/Math.PI); P.fitErr=null;
   update();
 });
-const kend=()=>{kdrag=null;hdrag=null;v3DraftEnd();}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
+const kend=()=>{kdrag=null;hdrag=null; if(HELD){ HELD=false; render(); } v3DraftEnd();}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
 /* v9 gestures, tablet layout only: one finger off a handle SWIPES between views; two fingers PINCH to
    zoom and pan (a second finger ends any handle drag); a double-tap fits the view again. */
 {
@@ -1837,7 +1850,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (28cb4adc7632) */
+<script>/* installable build (f21047e0161b) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
