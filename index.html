@@ -967,7 +967,7 @@ function drawWrap2D(g){
    track that cut it and how shallow that ball ran: full depth in the accent, A's ramp shading to
    --warn, B's to --ok. DEPTH ×n exaggerates the groove radially so a .010 step can be seen; the
    ball-tip centre lines ride the same exaggeration. The revision text is only in the STL. */
-const V3={gl:null,mode:'ALL',ex:1,lines:true,yaw:0,pitch:0.35,dist:3,tgt:[0,0,0],fov:30*Math.PI/180,dirty:true,mesh:null,stats:null,raf:0,timer:0,fitNext:true,draft:false,draftRaf:0,draftTimer:0,draftAt:0,draftMs:0};
+const V3={gl:null,mode:'ALL',ex:1,lines:true,yaw:0,pitch:0.35,dist:3,tgt:[0,0,0],fov:30*Math.PI/180,dirty:true,mesh:null,stats:null,raf:0,timer:0,fitNext:true,held:false};
 function v3Col(n){const s=tok(n); let m=s.match(/^#([0-9a-f]{6})$/i); if(m){const v=parseInt(m[1],16);return [(v>>16&255)/255,(v>>8&255)/255,(v&255)/255];}
   m=s.match(/^#([0-9a-f]{3})$/i); if(m) return [...m[1]].map(c=>parseInt(c+c,16)/255);
   m=s.match(/rgba?\(([^)]+)\)/); if(m){const p=m[1].split(/[ ,]+/).map(Number);return [p[0]/255,p[1]/255,p[2]/255];} return [0.6,0.6,0.6];}
@@ -983,10 +983,6 @@ function v3Build(g){
     x0-=pad; x1+=pad; if(x1-x0>2*Math.PI*R-1e-6){x1=x0+2*Math.PI*R*0.999;}
     const span=(x1-x0)/R; o={th0:x0/R,th1:x1/R,nth:Math.max(90,Math.ceil(span/(2*Math.PI)*1440)),dzs:0.0016,ks:[0,1],only:(k,ti)=>k===0||ti===0}; }
   else o={nth:720,dzs:0.0035,ks:undefined};
-  // While a handle is dragged the mesh is a DRAFT: a third of the angles and a third of the rows, about a
-  // ninth of carve()'s work, so the view follows the hand. Letting go builds it again at full detail. The
-  // STL and the program never come through here, so a draft cannot reach an export.
-  if(V3.draft){ o.nth=Math.max(60,Math.round(o.nth/3)); o.dzs*=3; }
   o.ex=ex;
   o.nz=Math.max(2,Math.ceil(L/o.dzs));
   const C=carve(g,o), nc=C.nc, nz=C.nz;
@@ -1029,7 +1025,7 @@ function v3Build(g){
       const z=Math.max(0,Math.min(L,pnt.z)), th=(pnt.x+k*g.w)/R, rr=R-pnt.d+0.0015; LP.push(rr*Math.cos(th),rr*Math.sin(th),-z);} });
   let bb=[1e9,1e9,1e9,-1e9,-1e9,-1e9]; for(let i=0;i<P.length;i+=3) for(let a=0;a<3;a++){bb[a]=Math.min(bb[a],P[i+a]);bb[a+3]=Math.max(bb[a+3],P[i+a]);}
   let sR=0; for(let q=0;q<C.RO.length;q++) sR+=C.RO[q];
-  V3.stats={draft:V3.draft,meanR:sR/C.RO.length,verts:P.length/3,tris:I.length/3,rampA:nA,rampB:nB,full:nG,mode:V3.mode,ex,span:one?(o.th1-o.th0)*180/Math.PI:360,lines:LP.length/6,bb,th0:one?o.th0:null,th1:one?o.th1:null};
+  V3.stats={meanR:sR/C.RO.length,verts:P.length/3,tris:I.length/3,rampA:nA,rampB:nB,full:nG,mode:V3.mode,ex,span:one?(o.th1-o.th0)*180/Math.PI:360,lines:LP.length/6,bb,th0:one?o.th0:null,th1:one?o.th1:null};
   return {P:new Float32Array(P),N:new Float32Array(N),K:new Float32Array(K),I:new Uint32Array(I),L:new Float32Array(LP),lineCol:cLine,bb,mid:one?(o.th0+o.th1)/2:(g.top[0].x+g.w/2)/R};
 }
 function v3Init(){
@@ -1051,17 +1047,12 @@ function v3Init(){
   $('#wrapbox').closest('.view').classList.add('v3-on');
 }
 function v3Dirty(){ V3.dirty=true; clearTimeout(V3.timer);
-  // A draft is spaced out: at most one per 100 ms, or three times as long as the last one took, so the 3D view gets
-  // about a quarter of the time and the view being dragged keeps the rest.
-  if(V3.draft){ if(V3.draftRaf||V3.draftTimer) return;
-    const wait=Math.max(0,V3.draftAt+Math.max(100,3*V3.draftMs)-performance.now());
-    V3.draftTimer=setTimeout(()=>{ V3.draftTimer=0; V3.draftRaf=requestAnimationFrame(()=>{ V3.draftRaf=0;
-      if(!V3.draft||$('#wrapbox').clientWidth<40) return; const t0=performance.now(); v3Frame(); V3.draftAt=performance.now(); V3.draftMs=V3.draftAt-t0; }); },wait);
-    return; }
+  // While a handle is held the 3D view does not rebuild at all (a carve() of the barrel cost most of a drag's work):
+  // it stays as it was, says so, and letting go builds it once at full detail. The exports never read this view.
+  if(V3.held){ const c=$('#w-cap'); if(!/waits until you let go/.test(c.textContent)) c.textContent+=' · 3D waits until you let go'; return; }
   V3.timer=setTimeout(()=>{ if($('#wrapbox').clientWidth>=40) v3Frame(); },120); }
-/* a handle drag starts and ends the draft; letting go rebuilds at full detail if a draft is on screen */
-function v3DraftStart(){ V3.draft=true; }
-function v3DraftEnd(){ if(!V3.draft) return; V3.draft=false; if(V3.gl&&(V3.dirty||(V3.stats&&V3.stats.draft))) v3Dirty(); }
+function v3HoldStart(){ V3.held=true; }
+function v3HoldEnd(){ if(!V3.held) return; V3.held=false; if(V3.gl&&V3.dirty) v3Dirty(); }
 function v3Upload(m){
   const gl=V3.gl,B=V3.bufs;
   gl.bindBuffer(gl.ARRAY_BUFFER,B.p);gl.bufferData(gl.ARRAY_BUFFER,m.P,gl.STATIC_DRAW);
@@ -1112,7 +1103,7 @@ function v3Draw(){
   for(const nm of ['n','c']){const l=gl.getAttribLocation(V3.pSurf,nm); if(l>=0) gl.disableVertexAttribArray(l);}
   if(V3.lines&&V3.nL){ gl.useProgram(V3.pLine); gl.uniformMatrix4fv(gl.getUniformLocation(V3.pLine,'M'),false,M); gl.uniform3fv(gl.getUniformLocation(V3.pLine,'C'),V3.lineCol);
     att(V3.pLine,'p',B.l); gl.drawArrays(gl.LINES,0,V3.nL); }
-  $('#w-cap').textContent=(V3.mode==='ONE'?`one index · ${V3.stats.span.toFixed(0)}° of ${S.N}`:`${S.N} indexes`)+(V3.stats.draft?' · draft while dragging':'');
+  $('#w-cap').textContent=(V3.mode==='ONE'?`one index · ${V3.stats.span.toFixed(0)}° of ${S.N}`:`${S.N} indexes`);
 }
 function v3Req(){ if(V3.raf) return; V3.raf=requestAnimationFrame(()=>{V3.raf=0; v3Draw();}); }
 function v3Wire(){
@@ -1683,7 +1674,7 @@ usvg.addEventListener('pointerdown',e=>{
   const fl=e.target.closest&&e.target.closest('[data-flip]');
   if(fl){ const tr=fl.dataset.flip, P=T[tr]; setRamp(tr,!P.on?'bot':P.dir==='bot'?'top':'off'); update(); return; }
   if(ds.knee){ kdrag=ds.knee; } else if(ds.h){ hdrag=ds.h; } else return;
-  HELD=true; v3DraftStart(); usvg.setPointerCapture(e.pointerId); e.preventDefault();
+  HELD=true; v3HoldStart(); usvg.setPointerCapture(e.pointerId); e.preventDefault();
 });
 usvg.addEventListener('pointermove',e=>{
   if(!kdrag&&!hdrag) return;
@@ -1721,7 +1712,7 @@ usvg.addEventListener('pointermove',e=>{
   P.a0=Math.min(80,Math.atan2(ex0,ez0)*180/Math.PI); P.a1=Math.min(80,Math.atan2(ex1,ez1)*180/Math.PI); P.fitErr=null;
   update();
 });
-const kend=()=>{kdrag=null;hdrag=null; if(HELD){ HELD=false; render(); } v3DraftEnd();}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
+const kend=()=>{kdrag=null;hdrag=null; if(HELD){ HELD=false; render(); } v3HoldEnd();}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
 /* v9 gestures, tablet layout only: one finger off a handle SWIPES between views; two fingers PINCH to
    zoom and pan (a second finger ends any handle drag); a double-tap fits the view again. */
 {
@@ -1850,7 +1841,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (f21047e0161b) */
+<script>/* installable build (dcdca9a166d2) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
