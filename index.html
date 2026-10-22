@@ -237,6 +237,16 @@ fieldset:disabled{opacity:.4;}
 .rnote{font-size:10.5px;color:var(--muted);line-height:1.4;}
 .rnote b{color:var(--warn);font-weight:600;}
 .u-drag:hover{fill:var(--bad);fill-opacity:.25;}
+.u-pt{fill:var(--viz);stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke;cursor:move;touch-action:none;}
+.u-pt.sm{stroke-dasharray:none;fill:var(--accent);fill-opacity:.35;}
+.u-pt.sel{stroke:var(--warn);stroke-width:3;}
+.u-ins{fill:none;stroke:transparent;pointer-events:stroke;cursor:copy;}
+.u-hdl{pointer-events:none;stroke:var(--warn);stroke-width:1.6;vector-effect:non-scaling-stroke;}
+.u-hw{fill:var(--warn);stroke:var(--viz);stroke-width:1.4;vector-effect:non-scaling-stroke;cursor:move;touch-action:none;}
+.u-ha{fill:var(--viz);stroke:var(--warn);stroke-width:2;vector-effect:non-scaling-stroke;cursor:move;touch-action:none;}
+.u-lock{pointer-events:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:3 2;vector-effect:non-scaling-stroke;}
+.u-comb{pointer-events:none;stroke:var(--warn);stroke-width:.8;opacity:.7;vector-effect:non-scaling-stroke;}
+.u-combl{pointer-events:none;fill:none;stroke:var(--warn);stroke-width:1.2;vector-effect:non-scaling-stroke;}
 tr.note-row td{color:var(--dim);font-size:10.5px;text-align:left;font-family:var(--sans);font-style:italic;}
 @media (max-width:820px){ .views,.shapes{grid-template-columns:1fr;} .push{margin-left:0;} }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important;} }
@@ -321,6 +331,7 @@ body.tabs .seg button{min-height:36px;}
       </div>
       <div class="btns">
         <button type="button" class="btn" id="b-save">Save design</button>
+        <button type="button" class="btn plain" id="b-default" title="Save this design as INDEX_BARREL_DEFAULT.json: uploaded to index-barrel-app/default/ on GitHub, it becomes the design this page opens on AND the builder's Index Barrel op default">Make default</button>
         <button type="button" class="btn plain" id="b-open">Open design</button>
         <input type="file" id="f-open" accept=".json,application/json" hidden>
         <button type="button" class="btn" id="b-stl">Export STL</button>
@@ -356,7 +367,7 @@ body.tabs .seg button{min-height:36px;}
 <section aria-labelledby="tile-h">
   <div class="intro">
     <h2 id="tile-h">Index path</h2>
-    <p class="lede" style="font-size:14.5px;margin-top:6px">Drag the red rings to move the four junctions and the orange knees to reshape the grooves, or use the sliders. The tiles underneath check ramp angle, lands, the one-way step and the back-feed guards live.</p>
+    <p class="lede" style="font-size:14.5px;margin-top:6px">Drag the red rings to move the four junctions and the orange knees to reshape the grooves, or use the sliders. In POINTS mode (or after <b>Spline from sliders</b>) drag any point, click the groove to add one, right-click or hold a point to remove it, and pick a spline point to pull its handle: the arrow tip sets the weight, the diamond the angle. The tiles underneath check ramp angle, lands, bends, the one-way step and the back-feed guards live.</p>
   </div>
 
   <div class="tile" id="tile">
@@ -415,7 +426,8 @@ body.tabs .seg button{min-height:36px;}
       <div class="shape" id="shape-A">
         <div class="sh-head"><span class="t">A · DOWN STROKE</span>
           <div class="seg" role="group" aria-label="A editing mode"><button type="button" id="A-m-s" data-tr="A" data-mode="SLIDERS" aria-pressed="true">SLIDERS</button><button type="button" id="A-m-p" data-tr="A" data-mode="POINTS" aria-pressed="false">POINTS</button></div>
-          <button type="button" class="btn plain" id="A-fit" data-fit="A">Fit to points</button></div>
+          <button type="button" class="btn plain" id="A-fit" data-fit="A">Fit to points</button>
+          <button type="button" class="btn plain" id="A-spl" data-spline="A" title="Turn A's shape into a few spline points with handles, ends locked to the slots, to fine-tune">Spline from sliders</button></div>
         <fieldset id="A-fs">
           <div class="sl"><label for="A-a0">Entry angle</label><input type="range" id="A-a0" data-p="a0" data-tr="A" min="0" max="80" step="0.25"><output id="A-a0-v"></output></div>
           <div class="sl"><label for="A-a1">Exit angle</label><input type="range" id="A-a1" data-p="a1" data-tr="A" min="0" max="80" step="0.25"><output id="A-a1-v"></output></div>
@@ -430,7 +442,8 @@ body.tabs .seg button{min-height:36px;}
       <div class="shape" id="shape-B">
         <div class="sh-head"><span class="t">B · UP STROKE</span>
           <div class="seg" role="group" aria-label="B editing mode"><button type="button" id="B-m-s" data-tr="B" data-mode="SLIDERS" aria-pressed="true">SLIDERS</button><button type="button" id="B-m-p" data-tr="B" data-mode="POINTS" aria-pressed="false">POINTS</button></div>
-          <button type="button" class="btn plain" id="B-fit" data-fit="B">Fit to points</button></div>
+          <button type="button" class="btn plain" id="B-fit" data-fit="B">Fit to points</button>
+          <button type="button" class="btn plain" id="B-spl" data-spline="B" title="Turn B's shape into a few spline points with handles, ends locked to the slots, to fine-tune">Spline from sliders</button></div>
         <fieldset id="B-fs">
           <div class="sl"><label for="B-a0">Entry angle</label><input type="range" id="B-a0" data-p="a0" data-tr="B" min="0" max="80" step="0.25"><output id="B-a0-v"></output></div>
           <div class="sl"><label for="B-a1">Exit angle</label><input type="range" id="B-a1" data-p="a1" data-tr="B" min="0" max="80" step="0.25"><output id="B-a1-v"></output></div>
@@ -472,11 +485,12 @@ const DES={
   B:[[0.5695,0.4988,0.0625,'SMOOTH'],[0.6793,0.3638,0.0625,'SMOOTH'],[0.7320,0.3150,0.0625,'SMOOTH'],[0.7690,0.2888,0.0625,'SMOOTH'],[0.8174,0.2625,0.0625,'SMOOTH']].map(([u,z,d,shape])=>({u,z,d,shape})),
   len:0.84375
 };
-/* The design the page opens on, and Reset puts back (operator 2026-10-22: 'make this index build default'): the
-   operator's DES001-R1_DESIGN_4.json, saved from this page, verbatim but its save time. DES above is still the
-   DES-001 points the sliders are first fitted to, before this file is loaded over them. */
-const DEFAULT_FILE={"app":"INDEX_BARREL_DESIGNER","format":1,"rev":"DES001-R1","N":6,"D":0.75,"ball":0.125,"zMode":"FIXED","Lk":1,"lenMode":"PATH","pinMin":0.01,"rows":{"top":{"u":-0.033013539743739884,"z":0.11364533752202988,"d":0.0625},"A":[{"u":-0.02836746579244806,"z":0.1516294753187541,"d":0.0625,"shape":"LINE"},{"u":-0.023721391841156233,"z":0.1896136131154783,"d":0.0625,"shape":"LINE"},{"u":-0.01907531788986441,"z":0.22759775091220247,"d":0.0625,"shape":"LINE"},{"u":-0.01442924393857258,"z":0.26558188870892674,"d":0.0625,"shape":"LINE"},{"u":-0.009783169987280757,"z":0.3035660265056509,"d":0.06245896962431958,"shape":"LINE"},{"u":-0.0004910025428773293,"z":0.34488521125122196,"d":0.05938496793561916,"shape":"LINE"},{"u":0.017198280009290773,"z":0.38577941194686916,"d":0.05634258356210008,"shape":"LINE"},{"u":0.04317102830508105,"z":0.42598589323899927,"d":0.053351363087887856,"shape":"LINE"},{"u":0.07726037371541684,"z":0.46524633820493577,"d":0.050430524381423425,"shape":"LINE"},{"u":0.11924730043688882,"z":0.5033085079767001,"d":0.047598833125304274,"shape":"LINE"},{"u":0.16886205261534648,"z":0.5399278623147622,"d":0.04487448225131013,"shape":"LINE"},{"u":0.22578586746204957,"z":0.5748691307199634,"d":0.04227497505521435,"shape":"LINE"},{"u":0.28965302322752723,"z":0.6079078239895982,"d":0.039817012742339855,"shape":"LINE"},{"u":0.3584714567872435,"z":0.640691692478,"d":0.03737800849489324,"shape":"LINE"},{"u":0.42728989034695974,"z":0.6734755609664017,"d":0.03493900424744662,"shape":"LINE"},{"u":0.49610832390667586,"z":0.7062594294548035,"d":0.0325,"shape":"LINE"}],"bot":{"u":0.49610832390667586,"z":0.4255474805831909,"d":0.0625},"B":[{"u":0.5286356742961672,"z":0.3899704459636134,"d":0.0598597656612283,"shape":"LINE"},{"u":0.5611630246856585,"z":0.35439341134403596,"d":0.05633717831618859,"shape":"LINE"},{"u":0.5936903750751499,"z":0.3188163767244585,"d":0.05281459097114889,"shape":"LINE"},{"u":0.6262177254646413,"z":0.283239342104881,"d":0.04929200362610918,"shape":"LINE"},{"u":0.6652225669609494,"z":0.24870132092793049,"d":0.045872292072811544,"shape":"LINE"},{"u":0.716562388810181,"z":0.21674790992742493,"d":0.04270849041185765,"shape":"LINE"},{"u":0.7791530622237882,"z":0.18805386042719424,"d":0.039867407766036624,"shape":"LINE"},{"u":0.841764194901279,"z":0.1632510194588061,"d":0.037411605177357754,"shape":"LINE"},{"u":0.9043753275787695,"z":0.138448178490418,"d":0.03495580258867888,"shape":"LINE"}],"len":0.84375},"shape":{"A":{"mode":"SLIDERS","a0":2.75,"a1":39.5,"R":0.5175,"sp":0.045,"end":{"u":0.4166666666666667,"z":0.7062594294548035},"rz":0.30301451683044434,"rl":0.40324491262435913,"step":0.03,"on":true,"dir":"bot"},"B":{"mode":"SLIDERS","a0":19.75,"a1":44.75,"R":0.26,"sp":0.045,"rz":0.11364533752202988,"rl":0.3029906526207924,"step":0.03,"on":true,"dir":"top"}},"cut":{"prog":7500,"tool":"T0707","dir":1,"rpm":3973,"feed":4,"plunge":1,"passes":3,"clearX":0.85,"gap":0.01,"tol":0.0002}};
+/* The design the page opens on, and Reset puts back (operator 2026-10-22: 'make this index build default').
+   WRITTEN BY unminified-workflow/build.js from index-barrel-app/default/INDEX_BARREL_DEFAULT.json (the file the
+   Make default button saves), which also sets the builder's INDEX_BARREL op default: edit that file, not this line. */
+const DEFAULT_FILE={"app":"INDEX_BARREL_DESIGNER","format":1,"rev":"DES001-R1","N":6,"D":0.75,"ball":0.125,"zMode":"FIXED","Lk":1,"lenMode":"PATH","pinMin":0.01,"rows":{"top":{"u":-0.033013539743739884,"z":0.11364533752202988,"d":0.0625},"A":[{"u":-0.02836746579244806,"z":0.1516294753187541,"d":0.0625,"shape":"LINE"},{"u":-0.023721391841156233,"z":0.1896136131154783,"d":0.0625,"shape":"LINE"},{"u":-0.01907531788986441,"z":0.22759775091220247,"d":0.0625,"shape":"LINE"},{"u":-0.01442924393857258,"z":0.26558188870892674,"d":0.0625,"shape":"LINE"},{"u":-0.009783169987280757,"z":0.3035660265056509,"d":0.06245896962431958,"shape":"LINE"},{"u":-0.0004910025428773293,"z":0.34488521125122196,"d":0.05938496793561916,"shape":"LINE"},{"u":0.017198280009290773,"z":0.38577941194686916,"d":0.05634258356210008,"shape":"LINE"},{"u":0.04317102830508105,"z":0.42598589323899927,"d":0.053351363087887856,"shape":"LINE"},{"u":0.07726037371541684,"z":0.46524633820493577,"d":0.050430524381423425,"shape":"LINE"},{"u":0.11924730043688882,"z":0.5033085079767001,"d":0.047598833125304274,"shape":"LINE"},{"u":0.16886205261534648,"z":0.5399278623147622,"d":0.04487448225131013,"shape":"LINE"},{"u":0.22578586746204957,"z":0.5748691307199634,"d":0.04227497505521435,"shape":"LINE"},{"u":0.28965302322752723,"z":0.6079078239895982,"d":0.039817012742339855,"shape":"LINE"},{"u":0.3584714567872435,"z":0.640691692478,"d":0.03737800849489324,"shape":"LINE"},{"u":0.42728989034695974,"z":0.6734755609664017,"d":0.03493900424744662,"shape":"LINE"},{"u":0.49610832390667586,"z":0.7062594294548035,"d":0.0325,"shape":"LINE"}],"bot":{"u":0.49610832390667586,"z":0.4255474805831909,"d":0.0625},"B":[{"u":0.5286356742961672,"z":0.3899704459636134,"d":0.0598597656612283,"shape":"LINE"},{"u":0.5611630246856585,"z":0.35439341134403596,"d":0.05633717831618859,"shape":"LINE"},{"u":0.5936903750751499,"z":0.3188163767244585,"d":0.05281459097114889,"shape":"LINE"},{"u":0.6262177254646413,"z":0.283239342104881,"d":0.04929200362610918,"shape":"LINE"},{"u":0.6652225669609494,"z":0.24870132092793049,"d":0.045872292072811544,"shape":"LINE"},{"u":0.716562388810181,"z":0.21674790992742493,"d":0.04270849041185765,"shape":"LINE"},{"u":0.7791530622237882,"z":0.18805386042719424,"d":0.039867407766036624,"shape":"LINE"},{"u":0.841764194901279,"z":0.1632510194588061,"d":0.037411605177357754,"shape":"LINE"},{"u":0.9043753275787695,"z":0.138448178490418,"d":0.03495580258867888,"shape":"LINE"}],"len":0.84375},"shape":{"A":{"mode":"SLIDERS","a0":2.75,"a1":39.5,"R":0.5175,"sp":0.045,"end":{"u":0.4166666666666667,"z":0.7062594294548035},"rz":0.30301451683044434,"rl":0.40324491262435913,"step":0.03,"on":true,"dir":"bot","cd":false},"B":{"mode":"SLIDERS","a0":19.75,"a1":44.75,"R":0.26,"sp":0.045,"rz":0.11364533752202988,"rl":0.3029906526207924,"step":0.03,"on":true,"dir":"top","cd":false}},"cut":{"prog":7500,"tool":"T0707","dir":1,"rpm":3973,"feed":4,"plunge":1,"passes":3,"clearX":0.85,"gap":0.01,"tol":0.0002}};
 const WALL=0.100;
+const FLOOR_WARN=15, FLOOR_STOP=25;   // floor-ramp degrees (operator 2026-10-22)
 const FULLD=()=>S.rows.bot.d;
 const clone=o=>JSON.parse(JSON.stringify(o));
 const S={N:6,D:0.75,ball:0.125,zMode:'FIXED',rot:20,rows:clone(DES),Lk:1,lenMode:'PATH',pinMin:0.010,top:{on:false,step:0.010,rl:0.08}};
@@ -498,30 +512,58 @@ function zm(){
 /* every Z the page draws or emits = stored Z × zs(). LENGTH in SCALE PATH mode is the Lk factor. */
 function zs(){ return zm()*S.Lk; }
 const cr=(p0,p1,p2,p3,t)=>0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t);
-function dense(n,w){
+/* v9 (operator 2026-10-22: "I like the way spline controls work in SolidWorks"): a SMOOTH point is a spline point.
+   With no handle and no locked end a segment is the Catmull-Rom curve it always was (cr), so an older design cuts
+   the same program. A point's handle (t: {a: degrees from the part axis, w: weight on the automatic tangent's
+   length}) or a locked end (T[tr].lockS where the groove leaves its slot, lockE where it arrives in the other: along Z
+   there) makes that segment a Hermite
+   curve with that tangent. Tangents are in the unrolled plane's inches, so they pull the way the drawing shows. */
+function tanAuto(n,i){ const p=n[i-1]||n[i], q=n[i+1]||n[i]; return {x:(q.x-p.x)/2,z:(q.z-p.z)/2}; }
+const travel=n=>n[n.length-1].z>=n[0].z?1:-1;   // A runs down the stroke (+Z), B up it (-Z); both run toward +C
+// a point's tangent as a unit direction and a weight: its handle, a locked end (along Z), or null for automatic
+function tanAt(n,i,tr){
+  const end=T[tr].mode==='POINTS'&&((i===0&&T[tr].lockS)||(i===n.length-1&&T[tr].lockE)), t=n[i].t;
+  if(!t&&!end) return null;                       // automatic: Catmull-Rom's own
+  const a=end?0:t.a, w=t&&isFinite(t.w)?t.w:1, r=a*Math.PI/180;
+  return {x:Math.sin(r), z:travel(n)*Math.cos(r), w};
+}
+function tanDir(n,i,tr){ const h=tanAt(n,i,tr); if(h) return h;
+  const m=tanAuto(n,i), L=Math.hypot(m.x,m.z)||1; return {x:m.x/L, z:m.z/L, w:1}; }
+// how long a point's handle is drawn: its weight times the mean of the spans either side
+function hLen(n,i){ const p=n[i-1]||n[i], q=n[i+1]||n[i], c=n[i]; return (Math.hypot(c.x-p.x,c.z-p.z)+Math.hypot(q.x-c.x,q.z-c.z))/((n[i-1]&&n[i+1])?2:1); }
+const hermite=(p1,p2,m1,m2,t)=>{const t2=t*t,t3=t2*t;return (2*t3-3*t2+1)*p1+(t3-2*t2+t)*m1+(-2*t3+3*t2)*p2+(t3-t2)*m2;};
+function dense(n,w,tr){
   const out=[{...n[0]}];
   for(let i=0;i<n.length-1;i++){
     const a=n[i],b=n[i+1],sm=b.shape==='SMOOTH',p0=n[i-1]||a,p3=n[i+2]||b,steps=sm?16:2;
+    // a Hermite span takes each end's direction and weight times THIS span's length, so a long span beside a short one
+    // does not overshoot it (unevenly spaced points); spans with no handle and no lock stay Catmull-Rom, as before
+    const hm=sm&&tr&&!!(tanAt(n,i,tr)||tanAt(n,i+1,tr)), c=hm?Math.hypot(b.x-a.x,b.z-a.z):0;
+    const da=hm?tanDir(n,i,tr):null, db=hm?tanDir(n,i+1,tr):null;
+    const ma=hm?{x:da.x*da.w*c,z:da.z*da.w*c}:null, mb=hm?{x:db.x*db.w*c,z:db.z*db.w*c}:null;
     for(let k=1;k<=steps;k++){
       const t=k/steps;
-      const x=sm?cr(p0.x,a.x,b.x,p3.x,t):a.x+(b.x-a.x)*t;
-      const z=sm?cr(p0.z,a.z,b.z,p3.z,t):a.z+(b.z-a.z)*t;
+      const x=hm?hermite(a.x,b.x,ma.x,mb.x,t):sm?cr(p0.x,a.x,b.x,p3.x,t):a.x+(b.x-a.x)*t;
+      const z=hm?hermite(a.z,b.z,ma.z,mb.z,t):sm?cr(p0.z,a.z,b.z,p3.z,t):a.z+(b.z-a.z)*t;
       out.push({x,z,u:x/w,d:a.d+(b.d-a.d)*t});
     }
   }
   return out;
 }
 function geom(){
+  clampRamps(); syncRailDepth();
   const w=Math.PI*S.D/S.N, k=zs(), R=S.rows;
-  const P=(u,z,d,shape)=>({u,x:u*w,z:z*k,d,shape:shape||'LINE'});
+  const P=(u,z,d,shape,t)=>({u,x:u*w,z:z*k,d,shape:shape||'LINE',t});
   const tu=R.top.u||0;
   if(R.A.length) R.A[R.A.length-1].u=R.bot.u;   // A ends where it crosses the bottom slot's centreline
   const top=[P(tu,0,R.top.d),P(tu,R.top.z,R.top.d)];
-  const aS=T.A.mode==='SLIDERS', bS=T.B.mode==='SLIDERS', full=R.bot.d;
-  const An=[P(tu,R.top.z,aS?R.top.d-(full-depthA(R.top.z)):R.top.d),...R.A.map(n=>P(n.u,n.z,n.d,n.shape))];
+  const aS=railOn('A'), bS=railOn('B'), full=R.bot.d;
+  const An=[P(tu,R.top.z,aS?R.top.d-(full-depthA(R.top.z)):R.top.d),...R.A.map(n=>P(n.u,n.z,n.d,n.shape,n.t))];
   const bot=[P(R.bot.u,R.bot.z,R.bot.d),P(R.bot.u,R.len,R.bot.d)];
-  const Bn=[P(R.bot.u,R.bot.z,bS?depthB(R.bot.z):R.bot.d),...R.B.map(n=>P(n.u,n.z,n.d,n.shape)),P(tu+1,R.top.z,bS?Math.max(0,R.top.d-(full-depthB(R.top.z))):R.top.d,'LINE')];
-  return {w,k,pitch:360/S.N,L:R.len*k,top,bot,An,Bn,A:dense(An,w),B:dense(Bn,w)};
+  const Bn=[P(R.bot.u,R.bot.z,bS?depthB(R.bot.z):R.bot.d),...R.B.map(n=>P(n.u,n.z,n.d,n.shape,n.t)),P(tu+1,R.top.z,bS?Math.max(0,R.top.d-(full-depthB(R.top.z))):R.top.d,
+    // a spline B with its ends locked runs smooth into the next top slot; otherwise the last span is straight, as before
+    T.B.mode==='POINTS'&&T.B.lockE&&R.B.length&&R.B[R.B.length-1].shape==='SMOOTH'?'SMOOTH':'LINE')];
+  return {w,k,pitch:360/S.N,L:R.len*k,top,bot,An,Bn,A:dense(An,w,'A'),B:dense(Bn,w,'B')};
 }
 function ends(tr,w,k){
   const R=S.rows;
@@ -566,6 +608,29 @@ function depthS(tr,zr){
 }
 function depthA(zr){ return depthS('A',zr); }
 function depthB(zr){ return depthS('B',zr); }
+/* v8 (operator 2026-10-22, "always start the ramp flush with the deep part ... get rid of the lip in any design"):
+   the rail sets a groove's depth in SLIDERS mode and in POINTS mode alike, unless POINTS has CUSTOM DEPTH on (cd) */
+function railOn(tr){ const P=T[tr]; return P.mode==='SLIDERS'||!P.cd; }
+/* A groove's stored-Z span, and the end where it LEAVES a slot: its deep end. Shallow at the bottom ('bot') drops the
+   pin into the bottom slot, so the groove leaves its other slot at the top; shallow at the top leaves at the bottom. */
+function spanOf(tr){ const R=S.rows, zMax=tr==='A'?(T.A.mode==='SLIDERS'?T.A.end.z:R.A[R.A.length-1].z):R.bot.z; return {zMin:R.top.z,zMax}; }
+/* The deep end never passes the junction where the groove leaves its slot: past it, the groove would start part way
+   up its ramp, a lip the pin meets coming out of the slot. Clamping the deep end (the shallow end stays) makes every
+   route there (a handle, a slider, a typed junction, an old file) flush. Returns what it moved. */
+function clampRamps(){
+  const out=[];
+  for(const tr of ['A','B']){
+    const P=T[tr]; if(!P.on||!railOn(tr)) continue;
+    const {zMin,zMax}=spanOf(tr), rz=rzOf(tr), e=rz+P.rl;
+    if(P.dir==='bot'&&rz<zMin-1e-9){ const lip=S.rows.bot.d-depthS(tr,zMin); P.rz=zMin; P.rl=Math.max(0,e-zMin); out.push({tr,was:rz,now:zMin,lip}); }
+    else if(P.dir==='top'&&e>zMax+1e-9){ const lip=S.rows.bot.d-depthS(tr,zMax); const nz=Math.min(rz,zMax); P.rz=nz; P.rl=Math.max(0,zMax-nz); out.push({tr,was:e,now:zMax,lip}); }
+  }
+  return out;
+}
+/* POINTS rows on the rail take the rail's depth at their Z, so adding or moving a point never makes a lip */
+function syncRailDepth(){
+  for(const tr of ['A','B']) if(T[tr].mode==='POINTS'&&!T[tr].cd) S.rows[tr].forEach(n=>{n.d=depthS(tr,n.z);});
+}
 /* flipping a ramp mirrors its window within the stroke, so it lands at the other end */
 function setRamp(tr,v){
   const P=T[tr], R=S.rows;
@@ -781,11 +846,37 @@ function checks(g){
   r.gTop=step('topB')?(guardTop(g)||nil):null;
   r.gTopA=step('topA')?(guardTopA(g)||nil):null;
   r.gBotB=step('botB')?(guardBotB(g)||nil):null;
+  // v8: how steeply each groove's FLOOR rises along the groove (the ramp the spring pin climbs). Operator 2026-10-22:
+  // warn at 15 degrees, stop at 25. A rise with no length under it (a typed depth jump) reads 90.
+  const floorAng=pts=>{let m=0,z=null;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],dd=Math.abs(b.d-a.d),ds=Math.hypot(b.x-a.x,b.z-a.z);
+    if(dd<1e-6) continue; const ang=ds<1e-6?90:Math.atan2(dd,ds)*180/Math.PI; if(ang>m){m=ang;z=(a.z+b.z)/2;}} return {ang:m,z};};
+  r.floorA=floorAng(g.A); r.floorB=floorAng(g.B);
+  // v9: the tightest bend of each groove's centre line. Under the ball's radius the groove's inside wall folds over
+  // itself (a stop); under twice it, warn. Points in line with both neighbours (a straight span's midpoints) are
+  // dropped first, so a polyline of points on an arc reads that arc's radius.
+  const bend=pts=>{const q=pts.filter((b,i)=>{const a=pts[i-1],c=pts[i+1];return !a||!c||Math.abs((b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x))>1e-12;});
+    let m=Infinity,z=null;for(let i=1;i<q.length-1;i++){const a=q[i-1],b=q[i],c=q[i+1];
+      const ab=Math.hypot(b.x-a.x,b.z-a.z),bc=Math.hypot(c.x-b.x,c.z-b.z),ca=Math.hypot(a.x-c.x,a.z-c.z),x2=Math.abs((b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x));
+      if(ab<1e-7||bc<1e-7||x2<1e-12) continue; const R=ab*bc*ca/(2*x2); if(R<m){m=R;z=b.z;}} return {R:m,z};};
+  r.bendA=bend(g.A); r.bendB=bend(g.B);
   const maxD=Math.max(S.rows.top.d,S.rows.bot.d,...S.rows.A.map(n=>n.d),...S.rows.B.map(n=>n.d));
   r.maxD=maxD; r.bore=S.D-2*(maxD+WALL);
   return r;
 }
 
+/* v9: the curvature comb (shown while a point or handle is held): a tooth at each point, normal to the path, as long
+   as the path's curvature there, so a kink or a flat spot shows before it is cut */
+const HS=1;   // a handle is drawn one tangent long each way: about half way to the next point, clear of the neighbours
+function combSvg(pts){
+  const K=[];let mx=0;
+  for(let i=1;i<pts.length-1;i++){const a=pts[i-1],b=pts[i],c=pts[i+1],ab=Math.hypot(b.x-a.x,b.z-a.z),bc=Math.hypot(c.x-b.x,c.z-b.z),ca=Math.hypot(c.x-a.x,c.z-a.z);
+    if(ab<1e-7||bc<1e-7||ca<1e-7) continue; const cr2=(b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x), k=2*cr2/(ab*bc*ca);
+    K.push({p:b,k,nx:-(c.z-a.z)/ca,nz:(c.x-a.x)/ca}); mx=Math.max(mx,Math.abs(k));}
+  if(!mx) return '';
+  const sc=S.ball*1.4/mx; let o='', tips=[];
+  for(const q of K){const t={x:q.p.x+q.nx*q.k*sc,z:q.p.z+q.nz*q.k*sc}; tips.push(t); o+=`<line class="u-comb" x1="${q.p.x}" y1="${q.p.z}" x2="${t.x}" y2="${t.z}"/>`;}
+  return o+`<polyline class="u-combl" points="${tips.map(t=>t.x+','+t.z).join(' ')}"/>`;
+}
 /* ── unrolled SVG ── */
 function drawUnrolled(g){
   const w=g.w,L=g.L,span=Math.max(3*w,L*1.25);
@@ -830,6 +921,25 @@ function drawUnrolled(g){
   hd(g.Bn[g.Bn.length-1].x,g.Bn[g.Bn.length-1].z,'topn','The same top junction, one index over');
   hd(g.bot[0].x,g.bot[0].z,'bot','Bottom slot top: drag to move it');
   hd(g.An[g.An.length-1].x,g.An[g.An.length-1].z,'aend','Where A crosses the bottom slot: drag along the slot');
+  // v9: POINTS mode, SolidWorks style. Every point drags; a click on the groove adds one there; right-click or a long
+  // press removes one. The selected spline point shows its handle: the arrow tip sets the weight, the diamond the angle.
+  for(const trn of ['A','B']){
+    const P=T[trn]; if(P.mode!=='POINTS') continue;
+    const nn=trn==='A'?g.An:g.Bn, rows=S.rows[trn], cls=trn==='A'?'ta':'tb', sz=travel(nn);
+    s+=`<polyline class="u-ins ${cls}" data-ins="${trn}" points="${pts(trn==='A'?g.A:g.B,0)}" stroke-width="${S.ball*0.45}"><title>Click to add a ${trn} point here</title></polyline>`;
+    for(const [i,on] of [[0,P.lockS],[nn.length-1,P.lockE]]) if(on){ const q=nn[i], L=S.ball*0.9;
+      s+=`<line class="u-lock ${cls}" x1="${q.x}" y1="${q.z-sz*L}" x2="${q.x}" y2="${q.z+sz*L}"><title>${trn} meets its slot along Z here (locked)</title></line>`; }
+    rows.forEach((n,i)=>{ const q=nn[i+1], sel=SEL&&SEL.tr===trn&&SEL.i===i, isEnd=trn==='A'&&i===rows.length-1;
+      s+=`<circle class="u-pt ${cls}${sel?' sel':''}${n.shape==='SMOOTH'?' sm':''}" data-h="pt-${trn}-${i}" cx="${q.x}" cy="${q.z}" r="${S.ball*0.13*HIT}"><title>${trn}${i+1}: drag to move${isEnd?' along the slot':''}; right-click or hold to remove${n.shape==='SMOOTH'?'; selected, it shows its handle':''}</title></circle>`; });
+    const si=SEL&&SEL.tr===trn?SEL.i:-1, row=rows[si], ni=si+1, lockedEnd=P.lockE&&ni===nn.length-1;
+    if(row&&row.shape==='SMOOTH'&&!lockedEnd){
+      const q=nn[ni], dd=tanDir(nn,ni,trn), Lh=dd.w*hLen(nn,ni), m={x:dd.x*Lh,z:dd.z*Lh}, tip={x:q.x+m.x*HS,z:q.z+m.z*HS}, back={x:q.x-m.x*HS,z:q.z-m.z*HS}, d=S.ball*0.1*HIT;
+      s+=`<line class="u-hdl" x1="${back.x}" y1="${back.z}" x2="${tip.x}" y2="${tip.z}"/>`;
+      s+=`<circle class="u-hw ${cls}" data-h="tw-${trn}-${si}" cx="${tip.x}" cy="${tip.z}" r="${S.ball*0.11*HIT}"><title>Arrow tip: drag along the handle to change the tangent weight</title></circle>`;
+      s+=`<rect class="u-ha ${cls}" data-h="ta-${trn}-${si}" x="${back.x-d}" y="${back.z-d}" width="${2*d}" height="${2*d}" transform="rotate(45 ${back.x} ${back.z})"><title>Diamond: drag to swing the tangent angle</title></rect>`;
+    }
+  }
+  if(COMB&&HELD) s+=combSvg(COMB==='A'?g.A:g.B);
   // v2: construction lines and the draggable knee for each groove in SLIDERS mode
   for(const trn of ['A','B']){
     const P=T[trn]; if(P.mode!=='SLIDERS'||!P.st||!P.st.ok) continue;
@@ -855,7 +965,7 @@ function drawUnrolled(g){
     if(cur.length>1) out.push(cur); return out;};
   let bands='';
   const rail=(tr,x0,sg)=>{
-    const P=T[tr], sl=P.mode==='SLIDERS', k=g.k, full=S.rows.bot.d, b=tr==='A'?'':' b';
+    const P=T[tr], sl=railOn(tr), k=g.k, full=S.rows.bot.d, b=tr==='A'?'':' b';
     const lc=tr==='A'?'warn':'ok', sc=tr==='A'?'bad':'ok', anc=sg>0?'start':'end';
     const X=f=>x0+sg*lw*f, xr=X(0.10), xp0=X(0.24), xp1=X(0.52), xl=X(0.56), sd=(xp1-xp0)/0.03;
     RAIL[tr]={xp0,sd,sg};
@@ -885,7 +995,7 @@ function drawUnrolled(g){
     s+=`<line class="u-rguide${b}" x1="${xp0}" y1="0" x2="${xp0}" y2="${L}"/>`;
     s+=`<polyline class="u-prof${b}" points="${trk.map(p=>`${(xp0+sg*Math.max(0,full-p.d)*sd).toFixed(5)},${p.z.toFixed(5)}`).join(' ')}"/>`;
     rt(X(0.5),-pt*0.66,`Z RAIL · ${tr} FLOOR`,'acc','middle');
-    const dl=!sl?'POINTS: FROM TABLE':(!P.on?'OFF ⇅':(P.dir==='bot'?'SHALLOW AT BOTTOM ⇅':'SHALLOW AT TOP ⇅'));
+    const dl=!sl?'POINTS: CUSTOM DEPTH':(!P.on?'OFF ⇅':(P.dir==='bot'?'SHALLOW AT BOTTOM ⇅':'SHALLOW AT TOP ⇅'));
     if(sl) s+=`<text class="u-txt u-flip${b}" data-flip="${tr}" x="${X(0.5)}" y="${-pt*0.40}" font-size="${fs*0.85}" text-anchor="middle"><title>Click to cycle ${tr}'s ramp: shallow at bottom, shallow at top, off</title>${dl}</text>`;
     else rt(X(0.5),-pt*0.40,dl,'dim','middle');
     rt(xr,-pt*0.12,'Z','dim','middle'); rt(xp0,-pt*0.12,'FULL','dim','middle'); rt(xp1,-pt*0.12,'+.030','dim','middle');
@@ -1166,6 +1276,9 @@ function readout(g,c){
     ...STEPS.filter(s=>c.j[s.k]>1e-5&&!c.bumps.includes(s.k)).flatMap(s=>{const st=c.j[s.k], gd=c[s.gd], lowPin=st<S.pinMin-1e-9, off=s.k==='botA'&&!c.inSlot;
       return [[`One-way step · ${s.slot} (${s.tr})`,`${st.toFixed(4)}"`,off?'A must end over the bottom slot':(lowPin?`under the pin's ${S.pinMin.toFixed(3)}"`:`${s.tr} drops into the ${s.slot} slot`),off||lowPin?'bad':'ok'],
         [`Back-feed guard · ${s.slot} (${s.tr})`,gd.climb===null?'—':`${gd.climb.toFixed(4)}"`,gd.climb===null?`no route back ${s.back} ${s.tr}`:`easiest way back ${s.back} ${s.tr} climbs this much, at Z ${f4(gd.z)}`,gd.climb===null?'':(gd.climb<S.pinMin-1e-9?'bad':gd.climb<st-5e-4?'warn':'ok')]];}),
+    ...['A','B'].map(t=>{const f=c['floor'+t]; return [`Floor ramp · ${t}`,`${f.ang.toFixed(1)}°`,f.z===null?'no ramp':`steepest climb of the floor along ${t}, at Z ${f4(f.z)}`,f.ang>=FLOOR_STOP?'bad':f.ang>=FLOOR_WARN?'warn':'ok'];}),
+    ...['A','B'].map(t=>{const b=c['bend'+t], r=S.ball/2; return [`Tightest bend · ${t}`,isFinite(b.R)?`R${f4(b.R)}`:'straight',
+      isFinite(b.R)?`${t}'s centre line at Z ${f4(b.z)}; the ball is R${f4(r)}${b.R<r?': the inside wall folds':''}`:`${t} has no bend`,b.R<r?'bad':b.R<2*r?'warn':'ok'];}),
     ['Bore at .100 wall',c.bore>0?`Ø${f4(c.bore)}`:'none',`under the ${c.maxD.toFixed(4)}" deepest floor`,c.bore>0?'ok':'bad'],
     ['Finish X',`X${f4(S.D-2*FULLD())}`,STEPS.filter(s=>c.j[s.k]>1e-5).map(s=>`${s.tr} ${c.bumps.includes(s.k)?'bump':'floor'} X${f4(S.D-2*(FULLD()-c.j[s.k]))}`).join(' · ')||'no step floor','']
   ];
@@ -1175,8 +1288,14 @@ function readout(g,c){
 /* ── chart ── */
 let desc=[];
 function numIn(id,val,step,on){return `<input type="number" id="${id}" value="${val}" step="${step}" data-on="${on}">`;}
+function hdlCell(tr,j,n,nn){
+  if(n.shape!=='SMOOTH') return '';
+  const ni=j+1; if(T[tr].lockE&&ni===nn.length-1) return ' <span class="note">locked to the slot</span>';
+  const m=tanAuto(nn,ni), sz=travel(nn), a=n.t?n.t.a:Math.atan2(m.x,sz*m.z)*180/Math.PI, w=n.t?n.t.w:1;
+  return ` <span class="hdl">∠<input type="number" class="hn" id="${tr}${j}-ta" step="0.5" data-ta="${tr}.${j}" value="${a.toFixed(1)}">° w<input type="number" class="hn" id="${tr}${j}-tw" step="0.05" data-tw="${tr}.${j}" value="${w.toFixed(2)}">${n.t?`<button type="button" class="add" data-tauto="${tr}.${j}" title="Back to the automatic tangent">auto</button>`:''}</span>`;
+}
 function buildTable(){
-  const R=S.rows,k=zs();
+  const R=S.rows,k=zs(), GG=geom();
   desc=[];
   const rows=[];
   const grp=t=>rows.push(`<tr class="grp"><td colspan="9">${t}</td></tr>`);
@@ -1199,8 +1318,8 @@ function buildTable(){
     rows.push(`<tr class="note-row"><td colspan="9">Rows A1–A${R.A.length-1} come from the A sliders. The end row stays editable. Switch A to POINTS to edit every row.</td></tr>`);
   } else
   R.A.forEach((n,j)=>{const ii=reg(()=>S.rows.A[j].u);
-    tr(`<td>A${j+1}</td><td class="l">A down</td><td>${numIn('a'+j+'-u',(n.u*100).toFixed(2),'0.1','A.'+j+'.u')}</td>${der(ii)}<td>${numIn('a'+j+'-z',f4(n.z*k),'0.001','A.'+j+'.z')}</td><td>${numIn('a'+j+'-d',f4(n.d),'0.0005','A.'+j+'.d')}</td><td><select id="a${j}-s" data-on="A.${j}.shape"><option${n.shape==='SMOOTH'?' selected':''}>SMOOTH</option><option${n.shape==='LINE'?' selected':''}>LINE</option></select></td><td>${R.A.length>1?`<button type="button" class="x" data-del="A.${j}" aria-label="Remove A${j+1}">×</button>`:''}</td>`);});
-  if(!aS) rows.push(`<tr><td colspan="9" class="l"><button type="button" class="add" data-add="A">+ A node</button></td></tr>`);
+    tr(`<td>A${j+1}</td><td class="l">A down</td><td>${numIn('a'+j+'-u',(n.u*100).toFixed(2),'0.1','A.'+j+'.u')}</td>${der(ii)}<td>${numIn('a'+j+'-z',f4(n.z*k),'0.001','A.'+j+'.z')}</td><td${T.A.cd?'':' class="der"'}>${T.A.cd?numIn('a'+j+'-d',f4(n.d),'0.0005','A.'+j+'.d'):f4(n.d)}</td><td><select id="a${j}-s" data-on="A.${j}.shape"><option${n.shape==='SMOOTH'?' selected':''}>SMOOTH</option><option${n.shape==='LINE'?' selected':''}>LINE</option></select>${hdlCell('A',j,n,GG.An)}</td><td>${R.A.length>1?`<button type="button" class="x" data-del="A.${j}" aria-label="Remove A${j+1}">×</button>`:''}</td>`);});
+  if(!aS){ rows.push(`<tr><td colspan="9" class="l"><button type="button" class="add" data-add="A">+ A node</button></td></tr>`); rows.push(`<tr class="note-row"><td colspan="9"><label><input type="checkbox" id="A-cd" data-cd="A"${T.A.cd?' checked':''}> Custom depth: type each A point's depth. Off, the Z rail sets it, so a point can never leave a lip.</label></td></tr>`); rows.push(`<tr class="note-row"><td colspan="9"><label><input type="checkbox" id="A-lockS" data-lock="A.lockS"${T.A.lockS?' checked':''}> A leaves the top slot along Z (locked tangent)</label> &nbsp; <label><input type="checkbox" id="A-lockE" data-lock="A.lockE"${T.A.lockE?' checked':''}> A arrives in the bottom slot along Z (locked tangent)</label></td></tr>`); }
 
   grp('BOTTOM SLOT · runs out the back face into the cutoff kerf');
   i=reg(()=>S.rows.bot.u);
@@ -1216,11 +1335,11 @@ function buildTable(){
       tr(`<td>B${j+1}</td><td class="l">B up</td><td>${(n.u*100).toFixed(2)}</td>${der(ii)}<td>${f4(n.z*k)}</td><td>${f4(n.d)}</td><td>LINE</td><td></td>`,'lk');});
   } else
   R.B.forEach((n,j)=>{const ii=reg(()=>S.rows.B[j].u);
-    tr(`<td>B${j+1}</td><td class="l">B up</td><td>${numIn('b'+j+'-u',(n.u*100).toFixed(2),'0.1','B.'+j+'.u')}</td>${der(ii)}<td>${numIn('b'+j+'-z',f4(n.z*k),'0.001','B.'+j+'.z')}</td><td>${numIn('b'+j+'-d',f4(n.d),'0.0005','B.'+j+'.d')}</td><td><select id="b${j}-s" data-on="B.${j}.shape"><option${n.shape==='SMOOTH'?' selected':''}>SMOOTH</option><option${n.shape==='LINE'?' selected':''}>LINE</option></select></td><td>${R.B.length>1?`<button type="button" class="x" data-del="B.${j}" aria-label="Remove B${j+1}">×</button>`:''}</td>`);});
+    tr(`<td>B${j+1}</td><td class="l">B up</td><td>${numIn('b'+j+'-u',(n.u*100).toFixed(2),'0.1','B.'+j+'.u')}</td>${der(ii)}<td>${numIn('b'+j+'-z',f4(n.z*k),'0.001','B.'+j+'.z')}</td><td${T.B.cd?'':' class="der"'}>${T.B.cd?numIn('b'+j+'-d',f4(n.d),'0.0005','B.'+j+'.d'):f4(n.d)}</td><td><select id="b${j}-s" data-on="B.${j}.shape"><option${n.shape==='SMOOTH'?' selected':''}>SMOOTH</option><option${n.shape==='LINE'?' selected':''}>LINE</option></select>${hdlCell('B',j,n,GG.Bn)}</td><td>${R.B.length>1?`<button type="button" class="x" data-del="B.${j}" aria-label="Remove B${j+1}">×</button>`:''}</td>`);});
   i=reg(()=>(S.rows.top.u||0)+1);
   tr(`<td>B${R.B.length+1}</td><td class="l">linked</td><td>${(((R.top.u||0)+1)*100).toFixed(2)}</td>${der(i)}<td>${f4(R.top.z*k)}</td><td>${f4(R.top.d)}</td><td>LINE</td><td class="note">= next index top slot</td>`,'lk');
   if(bS) rows.push(`<tr class="note-row"><td colspan="9">Rows B1–B${R.B.length} come from the B sliders. Switch B to POINTS to edit them.</td></tr>`);
-  else rows.push(`<tr><td colspan="9" class="l"><button type="button" class="add" data-add="B">+ B node</button></td></tr>`);
+  else { rows.push(`<tr><td colspan="9" class="l"><button type="button" class="add" data-add="B">+ B node</button></td></tr>`); rows.push(`<tr class="note-row"><td colspan="9"><label><input type="checkbox" id="B-cd" data-cd="B"${T.B.cd?' checked':''}> Custom depth: type each B point's depth. Off, the Z rail sets it, so a point can never leave a lip.</label></td></tr>`); rows.push(`<tr class="note-row"><td colspan="9"><label><input type="checkbox" id="B-lockS" data-lock="B.lockS"${T.B.lockS?' checked':''}> B leaves the bottom slot along Z (locked tangent)</label> &nbsp; <label><input type="checkbox" id="B-lockE" data-lock="B.lockE"${T.B.lockE?' checked':''}> B arrives in the top slot along Z (locked tangent)</label></td></tr>`); }
   $('#chart tbody').innerHTML=rows.join('');
 }
 function derived(g){
@@ -1262,7 +1381,7 @@ function syncBar(g){
   $('#ln-path').setAttribute('aria-pressed',String(S.lenMode==='PATH')); $('#ln-face').setAttribute('aria-pressed',String(S.lenMode==='FACE'));
   $('#ball').value=S.ball; $('#ball-v').textContent=`${FR(S.ball)} · ${S.ball.toFixed(4).replace(/^0/,'')}`;
   document.querySelectorAll('[data-rd]').forEach(b=>{const P=T[b.dataset.rd]; b.setAttribute('aria-pressed',String(b.dataset.v==='off'?!P.on:(P.on&&P.dir===b.dataset.v)));});
-  $('#B-top').disabled=T.B.mode!=='SLIDERS';
+  $('#B-top').disabled=!railOn('B');
 }
 function syncShape(g){
   for(const tr of ['A','B']){
@@ -1367,6 +1486,10 @@ const INDEX_BARREL_GEN=v=>{
       const ext=k=>{const x=v[k];return x===null||x===undefined||x===""?0:parseFloat(x);};
       const tE=ext("topExt"),bE=ext("botExt");
       if(!(tE>=0)||!(bE>=0))return ["(INDEX BARREL - A SLOT EXTENSION MUST BE 0 OR MORE)","#3000=9(SLOT EXTENSION MUST BE 0 OR MORE)"];
+      // A lip: the depth changing with no travel, where a groove leaves its slot. Designs exported before the designer's
+      // v8 (2026-10-22) can carry one (a ramp's deep end dragged past the junction). Operator: warn and cut it.
+      const lips=[];for(const [nm,p] of runs)for(let i=1;i<p.length;i++){const a=p[i-1],b=p[i];
+        if(Math.abs(b.x-a.x)<1e-6&&Math.abs(b.z-a.z)<1e-6&&Math.abs(b.d-a.d)>1e-5)lips.push({nm,z:a.z,h:Math.abs(b.d-a.d)});}
       if(tE>0){const p=runs[0][1][0];runs[0][1].unshift({x:p.x,z:p.z-tE,d:p.d});}
       if(bE>0){const p=runs[1][1][0];runs[1][1].unshift({x:p.x,z:p.z+bE,d:p.d});}
       const rev=F[1].replace(/[^A-Z0-9 .\-_/]/g,"")||"-";
@@ -1398,6 +1521,7 @@ const INDEX_BARREL_GEN=v=>{
         :zo===0?"(Z0 = FRONT FACE.  BOTTOM SLOTS RUN OUT AT THE BACK FACE INTO THE CUTOFF KERF)"
               :`(BARREL FRONT FACE AT Z${f4(zo)}.  BOTTOM SLOTS RUN OUT AT ITS BACK FACE Z${f4(zo+L)})`,
         ...(tE>0?[`(TOP SLOTS EXTENDED ${f4(tE)} TOWARD THE FRONT - THEY START AT Z${Z(runs[0][1][0].z)})`]:[]),
+        ...lips.map(l=>`(WARNING - LIP ${f4(l.h)} AT Z${Z(l.z)} IN ${l.nm.split(" - ")[0]} - EXPORT THE DESIGN AGAIN TO REMOVE IT)`),
         ...(tE>0||bE>0?[`(AN EXTENDED SLOT PLUNGES FROM X${f4(rapidX)} - THE SECTION IT RUNS INTO MUST BE NO BIGGER THAN THE BARREL OD)`]:[]),
         "(X = BALL TIP DIAMETER.  SET TOOL LENGTH TO THE BALL TIP ON CENTRELINE)");
       if(lines){
@@ -1591,8 +1715,8 @@ function buildSTL(opt){
 function designJSON(){
   return JSON.stringify({app:'INDEX_BARREL_DESIGNER',format:1,rev:clean($('#rev').value),savedAt:new Date().toISOString(),
     N:S.N,D:S.D,ball:S.ball,zMode:S.zMode,Lk:S.Lk,lenMode:S.lenMode,pinMin:S.pinMin,rows:S.rows,
-    shape:{A:{mode:T.A.mode,a0:T.A.a0,a1:T.A.a1,R:T.A.R,sp:T.A.sp,end:T.A.end,rz:T.A.rz,rl:T.A.rl,step:T.A.step,on:T.A.on,dir:T.A.dir},
-           B:{mode:T.B.mode,a0:T.B.a0,a1:T.B.a1,R:T.B.R,sp:T.B.sp,rz:T.B.rz,rl:T.B.rl,step:T.B.step,on:T.B.on,dir:T.B.dir}},cut:CUT},null,1);
+    shape:{A:{mode:T.A.mode,a0:T.A.a0,a1:T.A.a1,R:T.A.R,sp:T.A.sp,end:T.A.end,rz:T.A.rz,rl:T.A.rl,step:T.A.step,on:T.A.on,dir:T.A.dir,cd:!!T.A.cd,lockS:!!T.A.lockS,lockE:!!T.A.lockE},
+           B:{mode:T.B.mode,a0:T.B.a0,a1:T.B.a1,R:T.B.R,sp:T.B.sp,rz:T.B.rz,rl:T.B.rl,step:T.B.step,on:T.B.on,dir:T.B.dir,cd:!!T.B.cd,lockS:!!T.B.lockS,lockE:!!T.B.lockE}},cut:CUT},null,1);
 }
 function loadDesign(txt){
   const j=JSON.parse(txt);
@@ -1602,10 +1726,18 @@ function loadDesign(txt){
   // v1-v5 saves: A always shallow at the bottom; B's only step was the optional top step
   if(j.shape.A.on===undefined) Object.assign(T.A,{on:true,dir:'bot'});
   if(j.shape.B.on===undefined){ const t=j.top||{}; Object.assign(T.B,{on:!!t.on,dir:'top',rz:null,rl:t.rl??0.08,step:t.step??0.010}); }
+  // v1-v7 saves: a POINTS groove's depths were typed. They stay typed (custom depth) unless the rail gives the same.
+  // v1-v8 saves: no lock (ends were free), so a spline point there cuts as it always did
+  for(const tr of ['A','B']) for(const k of ['lockS','lockE']) if(j.shape[tr][k]===undefined) T[tr][k]=false;
+  SEL=null;
+  for(const tr of ['A','B']) if(j.shape[tr].cd===undefined) T[tr].cd=T[tr].mode==='POINTS'&&S.rows[tr].some(n=>Math.abs(n.d-depthS(tr,n.z))>1e-6);
+  const lips=clampRamps();
   Object.assign(CUT,{gap:0.010},j.cut||{});   // saves before the rapid gap existed plunged from Clear X; they get the .010 default
   $('#rev').value=j.rev||''; $('#n-idx').value=String(S.N); $('#dia').value=S.D.toFixed(3); $('#pin').value=S.pinMin.toFixed(3);
   document.querySelectorAll('[data-z]').forEach(o=>o.setAttribute('aria-pressed',String(o.dataset.z===S.zMode)));
   cutToForm(); update();
+  if(lips.length){ const k=zs(), fz=v=>f4(v).replace(/^(-?)0\./,'$1.');
+    say('#exp-msg',lips.map(c=>`${c.tr}'s ramp now starts at Z ${fz(c.now*k)} (was ${fz(c.was*k)}): the ${fz(c.lip)}" lip is gone, and the ramp is ${fz(Math.abs(c.was-c.now)*k)} shorter.`).join(' '),'ok'); }
 }
 function cutToForm(){
   $('#c-prog').value=CUT.prog; $('#c-tool').value=CUT.tool; $('#c-dir').value=String(CUT.dir); $('#c-rpm').value=CUT.rpm;
@@ -1632,7 +1764,7 @@ $('#ball').addEventListener('input',e=>{
   const v=parseFloat(e.target.value); if(!isFinite(v)) return;
   const R=S.rows, dNew=v/2, delta=dNew-R.bot.d;
   S.ball=v; R.top.d=dNew; R.bot.d=dNew;
-  for(const tr of ['A','B']) if(T[tr].mode==='POINTS') R[tr].forEach(n=>n.d=Math.max(0,n.d+delta));
+  for(const tr of ['A','B']) if(T[tr].mode==='POINTS'&&T[tr].cd) R[tr].forEach(n=>n.d=Math.max(0,n.d+delta));
   update();
 });
 /* LENGTH: SCALE PATH stretches every Z and keeps the groove shapes; BACK FACE ONLY moves the back face */
@@ -1671,10 +1803,22 @@ document.querySelectorAll('.shape input[type=range][data-p]').forEach(el=>el.add
 }));
 document.querySelectorAll('.shape .seg button[data-mode]').forEach(b=>b.addEventListener('click',()=>{
   const tr=b.dataset.tr;
-  if(b.dataset.mode==='POINTS'){ T[tr].mode='POINTS'; S.rows[tr].forEach(n=>n.shape='LINE'); buildTable(); render(); }
+  if(b.dataset.mode==='POINTS'){ T[tr].mode='POINTS'; T[tr].cd=false; T[tr].lockS=T[tr].lockE=true; S.rows[tr].forEach(n=>n.shape='LINE'); update(); }
   else { fitTrack(tr); update(); }
 }));
 document.querySelectorAll('[data-fit]').forEach(b=>b.addEventListener('click',()=>{ fitTrack(b.dataset.fit); update(); }));
+// v9: Spline from sliders: the groove as it is now, simplified to a few spline points (the junctions stay where they are),
+// ends locked tangent to the slots, ready to fine-tune with the handles
+function splineFrom(tr){
+  // each point keeps the slider curve's own direction there as its handle, so the spline follows the shape it came
+  // from instead of a Catmull-Rom guess through unevenly spaced points (which overshoots between them)
+  const g=geom(), all=tr==='A'?g.A:g.B, dp=dpSimplify(all,0.002), body=tr==='A'?dp.slice(1):dp.slice(1,-1), sz=travel(all);
+  if(!body.length) return;
+  S.rows[tr]=body.map(q=>{const j=all.indexOf(q), a=all[Math.max(0,j-1)], c=all[Math.min(all.length-1,j+1)];
+    return {u:q.x/g.w,z:q.z/g.k,d:q.d,shape:'SMOOTH',t:{a:Math.atan2(c.x-a.x,sz*(c.z-a.z))*180/Math.PI,w:1}};});
+  Object.assign(T[tr],{mode:'POINTS',cd:false,lockS:true,lockE:true}); SEL=null; update();
+}
+document.querySelectorAll('[data-spline]').forEach(b=>b.addEventListener('click',()=>splineFrom(b.dataset.spline)));
 /* v9: PATH VIEWS for the tablet layout. PV is which path is being edited; ZV is the two-finger zoom
    on top of that view's fit frame. The page layout keeps the whole drawing, untouched. */
 var FITS=null; let PV='A'; const ZV={z:1,cx:null,cy:null};
@@ -1697,11 +1841,28 @@ document.querySelectorAll('[data-pv]').forEach(x=>x.addEventListener('click',()=
 window.IBDVIEW={setPV,applyView,redraw:()=>render(),get pv(){return PV;},zoom:ZV};
 /* drag a knee in the unrolled view */
 const usvg=$('#unrolled'); let kdrag=null;
+var SEL=null, COMB=null, PRESS=null;   // v9: the selected path point, the path the comb is drawn on, a press held to remove
+function delPoint(tr,i){ const R=S.rows[tr]; if(tr==='A'&&i===R.length-1) return false; if(!R[i]) return false; R.splice(i,1); SEL=null; return true; }
+function insertPoint(tr,e){
+  const pt=usvg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; const q=pt.matrixTransform(usvg.getScreenCTM().inverse());
+  const g=geom(), nn=tr==='A'?g.An:g.Bn, dp=tr==='A'?g.A:g.B;
+  let best=Infinity, seg=0, at=null, idx=1;
+  for(let i=0;i<nn.length-1;i++){ const steps=nn[i+1].shape==='SMOOTH'?16:2;
+    for(let k=0;k<steps;k++,idx++){ const p=dp[idx], dd=Math.hypot(p.x-q.x,p.z-q.y); if(dd<best){best=dd;seg=i;at=p;} } }
+  if(!at) return;
+  S.rows[tr].splice(seg,0,{u:at.x/g.w,z:at.z/g.k,d:at.d,shape:'SMOOTH'}); SEL={tr,i:seg}; update();
+}
+usvg.addEventListener('contextmenu',e=>{ const m=/^pt-([AB])-(\d+)$/.exec((e.target.dataset||{}).h||''); if(!m) return; e.preventDefault(); if(delPoint(m[1],+m[2])) update(); });
 let hdrag=null; var RAIL={A:{xp0:0,sd:1,sg:-1},B:{xp0:0,sd:1,sg:1}};
 usvg.addEventListener('pointerdown',e=>{
   const ds=e.target.dataset||{};
   const fl=e.target.closest&&e.target.closest('[data-flip]');
   if(fl){ const tr=fl.dataset.flip, P=T[tr]; setRamp(tr,!P.on?'bot':P.dir==='bot'?'top':'off'); update(); return; }
+  if(ds.ins){ if(e.button===0) insertPoint(ds.ins,e); return; }
+  const sp=/^(pt|tw|ta)-([AB])-(\d+)$/.exec(ds.h||'');
+  if(sp){ if(e.button===2) return; SEL={tr:sp[2],i:+sp[3]}; COMB=sp[2];
+    if(sp[1]==='pt') PRESS={h:ds.h,x:e.clientX,y:e.clientY,t:setTimeout(()=>{ if(!PRESS||hdrag!==PRESS.h) return; const m=/^pt-([AB])-(\d+)$/.exec(PRESS.h); PRESS=null;
+      hdrag=null; COMB=null; HELD=false; v3HoldEnd(); if(delPoint(m[1],+m[2])) update(); else render(); },550)}; }
   if(ds.knee){ kdrag=ds.knee; } else if(ds.h){ hdrag=ds.h; } else return;
   HELD=true; v3HoldStart(); usvg.setPointerCapture(e.pointerId); e.preventDefault();
 });
@@ -1711,6 +1872,16 @@ usvg.addEventListener('pointermove',e=>{
   if(hdrag){
     const w=Math.PI*S.D/S.N, k=zs(), R=S.rows, u=q.x/w, z=q.y/k, cl=(v,a,b)=>Math.max(a,Math.min(b,v));
     const endZ=T.A.mode==='SLIDERS'?T.A.end.z:R.A[R.A.length-1].z;
+    if(PRESS&&Math.hypot(e.clientX-PRESS.x,e.clientY-PRESS.y)>6){ clearTimeout(PRESS.t); PRESS=null; }
+    const sm=/^(pt|tw|ta)-([AB])-(\d+)$/.exec(hdrag);
+    if(sm){ const tr=sm[2], i=+sm[3], row=S.rows[tr][i]; if(!row) return;
+      if(sm[1]==='pt'){ if(PRESS) return; row.z=cl(z,0.005,R.len); if(!(tr==='A'&&i===R.A.length-1)) row.u=cl(u,-0.5,1.5); }
+      else { const gg=geom(), nn=tr==='A'?gg.An:gg.Bn, p=nn[i+1], ma=tanAuto(nn,i+1), L=hLen(nn,i+1)||1e-9, sz=travel(nn),
+          t=row.t||{a:Math.atan2(ma.x,sz*ma.z)*180/Math.PI,w:1};
+        if(sm[1]==='tw'){ const r=t.a*Math.PI/180; t.w=cl(((q.x-p.x)*Math.sin(r)+(q.y-p.z)*sz*Math.cos(r))/(L*HS),0.05,5); }
+        else t.a=cl(Math.atan2(p.x-q.x,sz*(p.z-q.y))*180/Math.PI,-85,85);
+        row.t={a:t.a,w:t.w}; }
+      update(); return; }
     const rm=/^([AB])-(hi|lo|st)$/.exec(hdrag);
     if(rm){ const P=T[rm[1]], zhi=rm[1]==='A'?P.end.z:R.bot.z, rz=rzOf(rm[1]);
       // v7: either edge may run past the stroke's own ends, Z0 to the back face. A window hanging past a
@@ -1741,7 +1912,7 @@ usvg.addEventListener('pointermove',e=>{
   P.a0=Math.min(80,Math.atan2(ex0,ez0)*180/Math.PI); P.a1=Math.min(80,Math.atan2(ex1,ez1)*180/Math.PI); P.fitErr=null;
   update();
 });
-const kend=()=>{kdrag=null;hdrag=null; if(HELD){ HELD=false; render(); } v3HoldEnd();}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
+const kend=()=>{kdrag=null;hdrag=null;COMB=null; if(PRESS){ clearTimeout(PRESS.t); PRESS=null; } if(HELD){ HELD=false; render(); } v3HoldEnd();}; usvg.addEventListener('pointerup',kend); usvg.addEventListener('pointercancel',kend);
 /* v9 gestures, tablet layout only: one finger off a handle SWIPES between views; two fingers PINCH to
    zoom and pan (a second finger ends any handle drag); a double-tap fits the view again. */
 {
@@ -1786,9 +1957,17 @@ tbody.addEventListener('change',e=>{const t=e.target; if(!t.dataset.end) return;
   if(t.dataset.end==='z') T.A.end.z=v/zs(); T.A.fitErr=null; update();});
 tbody.addEventListener('input',e=>{const t=e.target;if(t.dataset.on&&t.tagName==='INPUT'){setPath(t.dataset.on,t.value,false);render();}});
 tbody.addEventListener('change',e=>{const t=e.target;if(t.tagName==='SELECT'){setPath(t.dataset.on,t.value,true);render();}});
+tbody.addEventListener('change',e=>{const t=e.target;if(t.dataset.cd){T[t.dataset.cd].cd=t.checked;update();}});
+// v9: a spline point's handle typed as numbers (angle from the part axis, weight), the ends' lock, and back to automatic
+tbody.addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.lock){const [tr,k]=t.dataset.lock.split('.');T[tr][k]=t.checked;update();return;}
+  const key=t.dataset.ta||t.dataset.tw; if(!key) return; const [tr,j]=key.split('.'), row=S.rows[tr][+j], v=parseFloat(t.value); if(!row||!isFinite(v)) return;
+  const g=geom(), nn=tr==='A'?g.An:g.Bn, m=tanAuto(nn,+j+1), cur=row.t||{a:Math.atan2(m.x,travel(nn)*m.z)*180/Math.PI,w:1};
+  row.t=t.dataset.ta?{a:Math.max(-85,Math.min(85,v)),w:cur.w}:{a:cur.a,w:Math.max(0.05,Math.min(5,v))}; SEL={tr,i:+j}; update();});
 tbody.addEventListener('click',e=>{
   const t=e.target;
-  if(t.dataset.del){const [tr,j]=t.dataset.del.split('.');S.rows[tr].splice(+j,1);buildTable();render();}
+  if(t.dataset.del){const [tr,j]=t.dataset.del.split('.');S.rows[tr].splice(+j,1);SEL=null;buildTable();render();}
+  if(t.dataset.tauto){const [tr,j]=t.dataset.tauto.split('.');delete S.rows[tr][+j].t;update();}
   if(t.dataset.add){
     const R=S.rows, arr=R[t.dataset.add];
     if(t.dataset.add==='A'){const a=arr[arr.length-2]||{u:0,z:R.top.z,d:R.top.d},b=arr[arr.length-1];arr.splice(arr.length-1,0,{u:(a.u+b.u)/2,z:(a.z+b.z)/2,d:(a.d+b.d)/2,shape:'SMOOTH'});}
@@ -1813,7 +1992,6 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>G&&draw
 addEventListener('resize',()=>{if(V3.gl&&G) v3Frame();});
 new MutationObserver(()=>G&&drawWrap(G)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
-T.A.mode='POINTS'; T.B.mode='POINTS'; fitTrack('A'); fitTrack('B');
 loadDesign(JSON.stringify(DEFAULT_FILE));
 
 /* ── app wiring ── */
@@ -1822,6 +2000,12 @@ document.querySelectorAll('#c-prog,#c-tool,#c-dir,#c-rpm,#c-feed,#c-plunge,#c-pa
 // _DESIGN in the name: this file re-opens HERE. The program builder loads the EXPORT "For the program builder" file instead
 $('#b-save').addEventListener('click',()=>{const n=fileBase()+'_DESIGN.json';saveFile(n,designJSON(),'application/json');say('#exp-msg',`Saved ${n}. It opens here, in the designer. For the program builder use EXPORT > For the program builder .json`,'ok');});
 $('#b-open').addEventListener('click',()=>$('#f-open').click());
+// Make default: the design file plus the one line the builder's op cuts. Uploaded to index-barrel-app/default/, the
+// next build (a session, the nightly run, or the barrel-default GitHub Action) makes it this page's opening design
+// and the INDEX_BARREL op's default together.
+$('#b-default').addEventListener('click',()=>{formToCut();const j=JSON.parse(designJSON());j.builderCode=designCode();
+  saveFile('INDEX_BARREL_DEFAULT.json',JSON.stringify(j,null,1),'application/json');
+  say('#exp-msg','Saved INDEX_BARREL_DEFAULT.json. Upload it to Hanwha Project/index-barrel-app/default/ on GitHub, replacing the file there: it becomes the design this page opens on and the builder\'s Index Barrel op default.','ok');});
 $('#f-open').addEventListener('change',e=>{const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=()=>{try{loadDesign(rd.result);say('#exp-msg',`Opened ${f.name}`,'ok');}catch(err){say('#exp-msg',`Could not open ${f.name}: ${err.message}`,'bad');}};
   rd.readAsText(f); e.target.value='';});
@@ -1870,7 +2054,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (08c7112e2f12) */
+<script>/* installable build (9c58cc6e2631) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
