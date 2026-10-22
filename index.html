@@ -377,7 +377,7 @@ body.tabs .seg button{min-height:36px;}
           <button type="button" id="zm-ang" data-z="ANGLE" aria-pressed="false">KEEP ANGLES</button>
         </div></div>
       <div class="push">
-        <button type="button" class="btn plain" id="reset">Reset to DES-001</button>
+        <button type="button" class="btn plain" id="reset">Reset to default</button>
         <button type="button" class="btn" id="copy-dxf">Copy DXF</button>
         <span class="status" id="copy-st" aria-live="polite"></span>
       </div>
@@ -472,6 +472,10 @@ const DES={
   B:[[0.5695,0.4988,0.0625,'SMOOTH'],[0.6793,0.3638,0.0625,'SMOOTH'],[0.7320,0.3150,0.0625,'SMOOTH'],[0.7690,0.2888,0.0625,'SMOOTH'],[0.8174,0.2625,0.0625,'SMOOTH']].map(([u,z,d,shape])=>({u,z,d,shape})),
   len:0.84375
 };
+/* The design the page opens on, and Reset puts back (operator 2026-10-22: 'make this index build default'): the
+   operator's DES001-R1_DESIGN_4.json, saved from this page, verbatim but its save time. DES above is still the
+   DES-001 points the sliders are first fitted to, before this file is loaded over them. */
+const DEFAULT_FILE={"app":"INDEX_BARREL_DESIGNER","format":1,"rev":"DES001-R1","N":6,"D":0.75,"ball":0.125,"zMode":"FIXED","Lk":1,"lenMode":"PATH","pinMin":0.01,"rows":{"top":{"u":-0.033013539743739884,"z":0.11364533752202988,"d":0.0625},"A":[{"u":-0.02836746579244806,"z":0.1516294753187541,"d":0.0625,"shape":"LINE"},{"u":-0.023721391841156233,"z":0.1896136131154783,"d":0.0625,"shape":"LINE"},{"u":-0.01907531788986441,"z":0.22759775091220247,"d":0.0625,"shape":"LINE"},{"u":-0.01442924393857258,"z":0.26558188870892674,"d":0.0625,"shape":"LINE"},{"u":-0.009783169987280757,"z":0.3035660265056509,"d":0.06245896962431958,"shape":"LINE"},{"u":-0.0004910025428773293,"z":0.34488521125122196,"d":0.05938496793561916,"shape":"LINE"},{"u":0.017198280009290773,"z":0.38577941194686916,"d":0.05634258356210008,"shape":"LINE"},{"u":0.04317102830508105,"z":0.42598589323899927,"d":0.053351363087887856,"shape":"LINE"},{"u":0.07726037371541684,"z":0.46524633820493577,"d":0.050430524381423425,"shape":"LINE"},{"u":0.11924730043688882,"z":0.5033085079767001,"d":0.047598833125304274,"shape":"LINE"},{"u":0.16886205261534648,"z":0.5399278623147622,"d":0.04487448225131013,"shape":"LINE"},{"u":0.22578586746204957,"z":0.5748691307199634,"d":0.04227497505521435,"shape":"LINE"},{"u":0.28965302322752723,"z":0.6079078239895982,"d":0.039817012742339855,"shape":"LINE"},{"u":0.3584714567872435,"z":0.640691692478,"d":0.03737800849489324,"shape":"LINE"},{"u":0.42728989034695974,"z":0.6734755609664017,"d":0.03493900424744662,"shape":"LINE"},{"u":0.49610832390667586,"z":0.7062594294548035,"d":0.0325,"shape":"LINE"}],"bot":{"u":0.49610832390667586,"z":0.4255474805831909,"d":0.0625},"B":[{"u":0.5286356742961672,"z":0.3899704459636134,"d":0.0598597656612283,"shape":"LINE"},{"u":0.5611630246856585,"z":0.35439341134403596,"d":0.05633717831618859,"shape":"LINE"},{"u":0.5936903750751499,"z":0.3188163767244585,"d":0.05281459097114889,"shape":"LINE"},{"u":0.6262177254646413,"z":0.283239342104881,"d":0.04929200362610918,"shape":"LINE"},{"u":0.6652225669609494,"z":0.24870132092793049,"d":0.045872292072811544,"shape":"LINE"},{"u":0.716562388810181,"z":0.21674790992742493,"d":0.04270849041185765,"shape":"LINE"},{"u":0.7791530622237882,"z":0.18805386042719424,"d":0.039867407766036624,"shape":"LINE"},{"u":0.841764194901279,"z":0.1632510194588061,"d":0.037411605177357754,"shape":"LINE"},{"u":0.9043753275787695,"z":0.138448178490418,"d":0.03495580258867888,"shape":"LINE"}],"len":0.84375},"shape":{"A":{"mode":"SLIDERS","a0":2.75,"a1":39.5,"R":0.5175,"sp":0.045,"end":{"u":0.4166666666666667,"z":0.7062594294548035},"rz":0.30301451683044434,"rl":0.40324491262435913,"step":0.03,"on":true,"dir":"bot"},"B":{"mode":"SLIDERS","a0":19.75,"a1":44.75,"R":0.26,"sp":0.045,"rz":0.11364533752202988,"rl":0.3029906526207924,"step":0.03,"on":true,"dir":"top"}},"cut":{"prog":7500,"tool":"T0707","dir":1,"rpm":3973,"feed":4,"plunge":1,"passes":3,"clearX":0.85,"gap":0.01,"tol":0.0002}};
 const WALL=0.100;
 const FULLD=()=>S.rows.bot.d;
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -635,7 +639,10 @@ function guardBottom(g){
 function guardTop(g){
   const r=S.ball/2, w=g.w*((S.rows.top.u||0)+1), W1=g.w, tz=g.An[0].z, Dt=S.rows.top.d, full=S.rows.bot.d;
   let ramp=null; for(let i=g.B.length-1;i>=0;i--){ if(g.B[i].d>=full-1e-5){ ramp=g.B[i]; break; } }
-  if(!ramp||ramp===g.B[g.B.length-1]) return {climb:0,z:tz};
+  // B never back at full depth (its ramp's deep end slid past the bottom-slot junction): the way back down B
+  // reaches the bottom slot where B starts. v6 returned a climb of 0 here, which read as "no guard at all".
+  if(!ramp) ramp=g.B[0];
+  if(ramp===g.B[g.B.length-1]) return {climb:0,z:tz};
   const zg=ramp.z+r/2;
   const box={x0:Math.min(...g.B.filter(p=>p.z<=zg+2*r).map(p=>p.x))-r,x1:w+2*r,z0:-r,z1:zg+2*r};
   from=new Int32Array(Math.ceil((box.x1-box.x0)/Math.max(0.0015,r/14)+2)*Math.ceil((box.z1-box.z0)/Math.max(0.0015,r/14)+2)).fill(-1);
@@ -653,6 +660,7 @@ function guardTop(g){
 function guardTopA(g){
   const r=S.ball/2, xs=g.An[0].x, tz=g.An[0].z, Dt=S.rows.top.d, full=S.rows.bot.d, W1=g.w;
   let seen=false, ramp=null; for(const p of g.A){ if(p.d<full-1e-5) seen=true; else if(seen){ ramp=p; break; } }
+  if(!ramp&&seen) ramp=g.A[g.A.length-1];   // A never back at full depth: the way back reaches the bottom slot (as guardTop)
   if(!ramp) return {climb:0,z:tz};
   const zg=ramp.z+r/2;
   const box={x0:xs-2*r,x1:Math.max(...g.A.filter(p=>p.z<=zg+2*r).map(p=>p.x))+r,z0:-r,z1:zg+2*r};
@@ -668,6 +676,7 @@ function guardTopA(g){
 function guardBotB(g){
   const r=S.ball/2, sx=g.bot[0].x, sz=g.bot[0].z, Ds=S.rows.bot.d;
   let seen=false, ramp=null; for(const p of g.B){ if(p.d<Ds-1e-5) seen=true; else if(seen){ ramp=p; break; } }
+  if(!ramp&&seen) ramp=g.B[g.B.length-1];   // B never back at full depth: the way back reaches the top slot (as guardTop)
   if(!ramp) return {climb:0,z:sz};
   const zg=ramp.z-r/2;
   const box={x0:sx-2*r,x1:Math.max(...g.B.filter(p=>p.z>=zg-2*r).map(p=>p.x))+r,z0:zg-2*r,z1:g.L+r};
@@ -758,12 +767,20 @@ function checks(g){
   const J=r.j={botA:Math.max(0,S.rows.bot.d-aEnd.d), topB:Math.max(0,S.rows.top.d-g.Bn[g.Bn.length-1].d),
                topA:Math.max(0,S.rows.top.d-g.An[0].d), botB:Math.max(0,S.rows.bot.d-g.Bn[0].d)};
   const e=1e-5, fw=J.botA>e||J.topB>e, rv=J.topA>e||J.botB>e;
-  r.drive=fw&&rv?'JAMS':fw?'FORWARD':rv?'REVERSE':'FREE';
-  const nil={climb:null,z:null};
-  r.gBot=J.botA>e?(guardBottom(g)||nil):null;
-  r.gTop=J.topB>e?(guardTop(g)||nil):null;
-  r.gTopA=J.topA>e?(guardTopA(g)||nil):null;
-  r.gBotB=J.botB>e?(guardBotB(g)||nil):null;
+  // v7 (operator 2026-10-22): a rise that faces the pin but is SMALLER than its engagement is a bump it rides over,
+  // by the same rule that says a step under the engagement cannot catch it (a ramp's deep end slid past the slot
+  // junction leaves one where the groove leaves the slot). So it jams only when a wall at least the pin's engagement
+  // faces each way; a bump is reported with its size, never as a step, and gets no back-feed guard of its own.
+  const pin=S.pinMin-1e-9, fwWall=Math.max(J.botA,J.topB)>=pin, rvWall=Math.max(J.topA,J.botB)>=pin;
+  r.bumps=[];
+  if(fw&&rv&&fwWall&&!rvWall){ r.drive='FORWARD'; r.bumps=['topA','botB'].filter(k=>J[k]>e); }
+  else if(fw&&rv&&rvWall&&!fwWall){ r.drive='REVERSE'; r.bumps=['botA','topB'].filter(k=>J[k]>e); }
+  else r.drive=fw&&rv?'JAMS':fw?'FORWARD':rv?'REVERSE':'FREE';
+  const nil={climb:null,z:null}, step=k=>J[k]>e&&!r.bumps.includes(k);
+  r.gBot=step('botA')?(guardBottom(g)||nil):null;
+  r.gTop=step('topB')?(guardTop(g)||nil):null;
+  r.gTopA=step('topA')?(guardTopA(g)||nil):null;
+  r.gBotB=step('botB')?(guardBotB(g)||nil):null;
   const maxD=Math.max(S.rows.top.d,S.rows.bot.d,...S.rows.A.map(n=>n.d),...S.rows.B.map(n=>n.d));
   r.maxD=maxD; r.bore=S.D-2*(maxD+WALL);
   return r;
@@ -1143,12 +1160,14 @@ function readout(g,c){
     ['Steepest ramp · A',`${c.angA.toFixed(1)}°`,c.revA?'reverses direction':'from the part axis',c.revA?'bad':(c.angA>55?'bad':c.angA>45?'warn':'ok')],
     ['Steepest ramp · B',`${c.angB.toFixed(1)}°`,c.revB?'reverses direction':'from the part axis',c.revB?'bad':(c.angB>55?'bad':c.angB>45?'warn':'ok')],
     ['Narrowest land',c.land===null?'none':`${c.land.toFixed(4)}"`,c.land===null?`grooves merge across Z ${f4(c.zMid)}`:`${c.lands.length} per index, across the barrel at Z ${f4(c.zMid)}`,c.land===null?'bad':(c.land<0.02?'warn':'ok')],
-    ['Drives',c.drive,{FORWARD:'A down, B up',REVERSE:'B down, A up',JAMS:'a step faces each way: the pin meets a wall',FREE:'no step: it can reverse'}[c.drive],c.drive==='FORWARD'||c.drive==='REVERSE'?'ok':'bad'],
-    ...STEPS.filter(s=>c.j[s.k]>1e-5).flatMap(s=>{const st=c.j[s.k], gd=c[s.gd], lowPin=st<S.pinMin-1e-9, off=s.k==='botA'&&!c.inSlot;
+    ['Drives',c.drive,{FORWARD:'A down, B up',REVERSE:'B down, A up',JAMS:'a step at least the pin\'s engagement faces each way: the pin meets a wall',FREE:'no step: it can reverse'}[c.drive],c.drive==='FORWARD'||c.drive==='REVERSE'?'ok':'bad'],
+    ...STEPS.filter(s=>c.bumps.includes(s.k)).map(s=>[`Bump · ${s.slot} (${s.tr})`,`${c.j[s.k].toFixed(4)}"`,
+      `${s.tr} starts this much shallower than the ${s.slot} slot: the pin climbs it into ${s.tr}, under its ${S.pinMin.toFixed(3)}" engagement, so it is not a wall`,'warn']),
+    ...STEPS.filter(s=>c.j[s.k]>1e-5&&!c.bumps.includes(s.k)).flatMap(s=>{const st=c.j[s.k], gd=c[s.gd], lowPin=st<S.pinMin-1e-9, off=s.k==='botA'&&!c.inSlot;
       return [[`One-way step · ${s.slot} (${s.tr})`,`${st.toFixed(4)}"`,off?'A must end over the bottom slot':(lowPin?`under the pin's ${S.pinMin.toFixed(3)}"`:`${s.tr} drops into the ${s.slot} slot`),off||lowPin?'bad':'ok'],
         [`Back-feed guard · ${s.slot} (${s.tr})`,gd.climb===null?'—':`${gd.climb.toFixed(4)}"`,gd.climb===null?`no route back ${s.back} ${s.tr}`:`easiest way back ${s.back} ${s.tr} climbs this much, at Z ${f4(gd.z)}`,gd.climb===null?'':(gd.climb<S.pinMin-1e-9?'bad':gd.climb<st-5e-4?'warn':'ok')]];}),
     ['Bore at .100 wall',c.bore>0?`Ø${f4(c.bore)}`:'none',`under the ${c.maxD.toFixed(4)}" deepest floor`,c.bore>0?'ok':'bad'],
-    ['Finish X',`X${f4(S.D-2*FULLD())}`,STEPS.filter(s=>c.j[s.k]>1e-5).map(s=>`${s.tr} floor X${f4(S.D-2*(FULLD()-c.j[s.k]))}`).join(' · ')||'no step floor','']
+    ['Finish X',`X${f4(S.D-2*FULLD())}`,STEPS.filter(s=>c.j[s.k]>1e-5).map(s=>`${s.tr} ${c.bumps.includes(s.k)?'bump':'floor'} X${f4(S.D-2*(FULLD()-c.j[s.k]))}`).join(' · ')||'no step floor','']
   ];
   $('#readout').innerHTML=items.map(([k,v,n,st])=>`<div class="ro"${st?` data-state="${st}"`:''}><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n}</span></div>`).join('');
 }
@@ -1343,6 +1362,13 @@ const INDEX_BARREL_GEN=v=>{
           const q=p.split(",").map(num);if(q.length!==3)throw new Error("bad point");return {x:q[0],z:q[1],d:q[2]};})]);
       }catch(e){return bad("DAMAGED - EXPORT IT AGAIN");}
       if(!(N>=2&&Dia>0&&ball>0&&D>0&&L>0)||runs.some(([,p])=>p.length<2))return bad("DAMAGED - EXPORT IT AGAIN");
+      // The slot extensions: a straight run (no C) added at the START of each run, where the slot runs out of the
+      // barrel: the top slot toward the front (-Z), the bottom slot past the back face (+Z). Blank = 0, as designed.
+      const ext=k=>{const x=v[k];return x===null||x===undefined||x===""?0:parseFloat(x);};
+      const tE=ext("topExt"),bE=ext("botExt");
+      if(!(tE>=0)||!(bE>=0))return ["(INDEX BARREL - A SLOT EXTENSION MUST BE 0 OR MORE)","#3000=9(SLOT EXTENSION MUST BE 0 OR MORE)"];
+      if(tE>0){const p=runs[0][1][0];runs[0][1].unshift({x:p.x,z:p.z-tE,d:p.d});}
+      if(bE>0){const p=runs[1][1][0];runs[1][1].unshift({x:p.x,z:p.z+bE,d:p.d});}
       const rev=F[1].replace(/[^A-Z0-9 .\-_/]/g,"")||"-";
       const R=Dia/2,r=ball/2,pitch=360/N,f4=x=>x.toFixed(4),zo=parseFloat(v.zOff)||0,Z=z=>f4(z+zo);
       let maxStep=0;for(const [,p] of runs)for(const q of p)maxStep=Math.max(maxStep,D-q.d);
@@ -1368,8 +1394,11 @@ const INDEX_BARREL_GEN=v=>{
       o.push(`(REV ${rev} - FROM INDEX BARREL DESIGNER)`,
         `(${N} INDEXES  OD ${f4(Dia)}  LG ${f4(L)}  BORE ${bore>0?f4(bore):"NONE"})`,
         `(BALL ${f4(ball)}  DEPTH ${f4(D)}  MAX STEP ${f4(maxStep)})`,
-        zo===0?"(Z0 = FRONT FACE.  BOTTOM SLOTS RUN OUT AT THE BACK FACE INTO THE CUTOFF KERF)"
+        bE>0?`(${zo===0?"Z0 = FRONT FACE":`BARREL FRONT FACE AT Z${f4(zo)}`}.  BOTTOM SLOTS EXTENDED ${f4(bE)} PAST THE BACK FACE Z${f4(zo+L)} TO Z${f4(zo+L+bE)})`
+        :zo===0?"(Z0 = FRONT FACE.  BOTTOM SLOTS RUN OUT AT THE BACK FACE INTO THE CUTOFF KERF)"
               :`(BARREL FRONT FACE AT Z${f4(zo)}.  BOTTOM SLOTS RUN OUT AT ITS BACK FACE Z${f4(zo+L)})`,
+        ...(tE>0?[`(TOP SLOTS EXTENDED ${f4(tE)} TOWARD THE FRONT - THEY START AT Z${Z(runs[0][1][0].z)})`]:[]),
+        ...(tE>0||bE>0?[`(AN EXTENDED SLOT PLUNGES FROM X${f4(rapidX)} - THE SECTION IT RUNS INTO MUST BE NO BIGGER THAN THE BARREL OD)`]:[]),
         "(X = BALL TIP DIAMETER.  SET TOOL LENGTH TO THE BALL TIP ON CENTRELINE)");
       if(lines){
         const n=Math.max(1,passes),floor=D-maxStep;
@@ -1624,7 +1653,7 @@ document.querySelectorAll('[data-z]').forEach(b=>b.addEventListener('click',()=>
   S.zMode=b.dataset.z; document.querySelectorAll('[data-z]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));
   update();
 }));
-function resetAll(){ S.rows=clone(DES); S.Lk=1; S.ball=0.125; S.pinMin=0.010; Object.assign(T.A,{on:true,dir:'bot'}); Object.assign(T.B,{on:false,dir:'top',rz:null,rl:0.08,step:0.010}); $('#pin').value='0.010'; T.A.mode='POINTS'; T.B.mode='POINTS'; fitTrack('A'); fitTrack('B'); update(); }
+function resetAll(){ loadDesign(JSON.stringify(DEFAULT_FILE)); }
 $('#reset').addEventListener('click',resetAll);
 /* shape sliders */
 document.querySelectorAll('.shape input[type=range][data-p]').forEach(el=>el.addEventListener('input',()=>{
@@ -1785,7 +1814,7 @@ addEventListener('resize',()=>{if(V3.gl&&G) v3Frame();});
 new MutationObserver(()=>G&&drawWrap(G)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
 T.A.mode='POINTS'; T.B.mode='POINTS'; fitTrack('A'); fitTrack('B');
-update();
+loadDesign(JSON.stringify(DEFAULT_FILE));
 
 /* ── app wiring ── */
 cutToForm();
@@ -1841,7 +1870,7 @@ layout(saved?saved==='tabs':(matchMedia('(pointer:coarse)').matches||innerWidth<
 window.IBDTABS={go,layout};
 })();
 </script>
-<script>/* installable build (dcdca9a166d2) */
+<script>/* installable build (08c7112e2f12) */
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))
   addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('offline cache not installed:',e)));
 </script>
